@@ -210,17 +210,38 @@ def create_vertical_dendrogram_with_query_labels_right(df, calc_func=calculate_r
             label = ref
         updated_labels.append(label)
 
+    # Calculate responsive dimensions
+    num_labels = len(updated_labels)
+    min_height = max(400, 25 * num_labels)  # Reduced from 30 to 25 per label
+    max_height = min(800, min_height)  # Cap maximum height
+    
+    # Make width responsive and ensure it fits within the card
+    responsive_width = min(1000, max(600, 15 * len(max(updated_labels, key=len))))
+    
     fig.update_layout(
         yaxis=dict(
             ticktext=updated_labels,
             tickvals=fig['layout']['yaxis']['tickvals'],
-            tickfont=dict(size=10)
+            tickfont=dict(size=9),  # Reduced font size
+            tickangle=0
         ),
-        width=1200,
-        height=max(400, 30 * len(updated_labels)),
-        margin=dict(l=50, r=350, t=40, b=40),
-        title=text,
-        font=dict(size=10)
+        width=responsive_width,
+        height=max_height,
+        margin=dict(l=50, r=200, t=40, b=40),  # Reduced right margin
+        title=dict(
+            text=text,
+            x=0.5,
+            xanchor='center',
+            font=dict(size=14)  # Reduced title font size
+        ),
+        font=dict(size=9),  # Reduced general font size
+        autosize=True,  # Enable autosize
+        # Ensure the plot fits within its container
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray'
+        )
     )
 
     return fig

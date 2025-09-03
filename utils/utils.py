@@ -40,7 +40,7 @@ def calculate_cosine(x, y):
 def reprint(data, epsilon=10e-4):
     # Extracting mutation categories and their probabilities
     mutation_types = data.index
-    signatures = data.columns[0:]
+    signatures = data.columns
 
     # Initialize a dictionary to store the RePrint probabilities for each signature
     reprint_probabilities = {signature: {} for signature in signatures}
@@ -94,7 +94,15 @@ def parse_signatures(contents, filename):
         if 'Type' not in df.columns:
             raise ValueError("Uploaded file must include a 'Type' column.")
 
+        # Dodatkowe sprawdzenie danych
+        print(f"Parsed file: {filename}")
+        print(f"Columns: {df.columns.tolist()}")
+        print(f"Shape: {df.shape}")
+        print(f"First few rows:")
+        print(df.head())
+
         return df
 
     except Exception as e:
+        print(f"Error parsing file {filename}: {str(e)}")
         raise ValueError(f"Error while parsing file {filename}: {str(e)}")

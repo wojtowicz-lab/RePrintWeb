@@ -203,16 +203,23 @@ dbc.Alert(
     ),
     dcc.Upload(
             id='upload-data-2-signatures',
-            children=html.Div(['Drag and drop your signatures']),
+            children=html.Div([
+                html.Div('📁 Drag and drop your signatures here', style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+                html.Div('or click to browse files', style={'fontSize': '12px', 'color': '#666'}),
+                html.Div('(.txt format, tab-separated)', style={'fontSize': '11px', 'color': '#888', 'fontStyle': 'italic'})
+            ]),
             style={
-                'width': '300px',
-                'height': '60px',
-                'lineHeight': '60px',
-                'borderWidth': '1px',
+                'width': '350px',
+                'height': '80px',
+                'lineHeight': '25px',
+                'borderWidth': '2px',
                 'borderStyle': 'dashed',
-                'borderRadius': '5px',
+                'borderRadius': '8px',
                 'textAlign': 'center',
-                'margin': '10px'
+                'margin': '10px',
+                'backgroundColor': '#f8f9fa',
+                'borderColor': '#007bff',
+                'cursor': 'pointer'
             },
             multiple=False
     ),
