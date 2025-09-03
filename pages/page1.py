@@ -247,19 +247,51 @@ page1_layout = html.Div([
     ], className="mb-4"),
     dbc.Row([
         dbc.Col([
-            html.H5("Signature similarity"),
+            html.H5("Signature Similarity"),
             dcc.Loading(
                 id="loading-heatmap-plot",
                 type="default",
-                children=dcc.Graph(id='heatmap-plot')
+                children=dcc.Graph(
+                    id='heatmap-plot',
+                    config={
+                        'displayModeBar': True,
+                        'displaylogo': False,
+                        'modeBarButtonsToAdd': [
+                            'toImage'
+                        ],
+                        'toImageButtonOptions': {
+                            'format': 'png',
+                            'filename': 'signature_similarity_heatmap',
+                            'height': 600,
+                            'width': 800,
+                            'scale': 2
+                        }
+                    }
+                )
             )
         ]),
         dbc.Col([
-            html.H5("RePrint similarity"),
+            html.H5("RePrint Similarity"),
             dcc.Loading(
                 id="loading-heatmap-reprint-plot",
                 type="default",
-                children=dcc.Graph(id='heatmap-reprint-plot')
+                children=dcc.Graph(
+                    id='heatmap-reprint-plot',
+                    config={
+                        'displayModeBar': True,
+                        'displaylogo': False,
+                        'modeBarButtonsToAdd': [
+                            'toImage'
+                        ],
+                        'toImageButtonOptions': {
+                            'format': 'png',
+                            'filename': 'reprint_similarity_heatmap',
+                            'height': 600,
+                            'width': 800,
+                            'scale': 2
+                        }
+                    }
+                )
             )
         ])
     ]),

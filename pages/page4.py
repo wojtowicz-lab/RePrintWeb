@@ -232,7 +232,7 @@ page4_layout = html.Div([
             dbc.Col([
                 dbc.Card([
                     dbc.CardHeader([
-                        html.H5("📊 Signature Similarity", className="mb-0", style={"color": "#2c3e50", "fontWeight": "bold"})
+                        html.H5("📊 Signatures", className="mb-0", style={"color": "#2c3e50", "fontWeight": "bold"})
                     ], style={"backgroundColor": "#e8f4fd", "borderBottom": "2px solid #3498db"}),
                     dbc.CardBody([
                         dcc.Loading(
@@ -245,6 +245,16 @@ page4_layout = html.Div([
                                     'displayModeBar': True,
                                     'displaylogo': False,
                                     'modeBarButtonsToRemove': ['pan2d', 'lasso2d', 'select2d'],
+                                    'modeBarButtonsToAdd': [
+                                        'toImage'
+                                    ],
+                                    'toImageButtonOptions': {
+                                        'format': 'png',
+                                        'filename': 'signature_similarity_dendrogram',
+                                        'height': 600,
+                                        'width': 800,
+                                        'scale': 2
+                                    },
                                     'responsive': True,
                                     'scrollZoom': True,
                                 }
@@ -256,7 +266,7 @@ page4_layout = html.Div([
             dbc.Col([
                 dbc.Card([
                     dbc.CardHeader([
-                        html.H5("🔄 RePrint Similarity", className="mb-0", style={"color": "#2c3e50", "fontWeight": "bold"})
+                        html.H5("🔄 RePrints", className="mb-0", style={"color": "#2c3e50", "fontWeight": "bold"})
                     ], style={"backgroundColor": "#fff3cd", "borderBottom": "2px solid #f39c12"}),
                     dbc.CardBody([
                         dcc.Loading(
@@ -269,6 +279,16 @@ page4_layout = html.Div([
                                     'displayModeBar': True,
                                     'displaylogo': False,
                                     'modeBarButtonsToRemove': ['pan2d', 'lasso2d', 'select2d'],
+                                    'modeBarButtonsToAdd': [
+                                        'toImage'
+                                    ],
+                                    'toImageButtonOptions': {
+                                        'format': 'png',
+                                        'filename': 'reprint_similarity_dendrogram',
+                                        'height': 600,
+                                        'width': 800,
+                                        'scale': 2
+                                    },
                                     'responsive': True,
                                     'scrollZoom': True,
                                 }
@@ -351,8 +371,8 @@ def update_graph(init_load, selected_file, n_clicks, selected_signatures, signat
                 df_reprint = df_all  # Fallback to original data
             
             return (
-                create_vertical_dendrogram_with_query_labels_right(df_all, calc_func=functions[distance_metric], method=clustering_method, text="Dendrogram of _ref and _query signatures"),
-                create_vertical_dendrogram_with_query_labels_right(df_reprint, calc_func=functions[distance_metric], method=clustering_method, text="Dendrogram of _ref and _query reprints")
+                create_vertical_dendrogram_with_query_labels_right(df_all, calc_func=functions[distance_metric], method=clustering_method, text="Signatures"),
+                create_vertical_dendrogram_with_query_labels_right(df_reprint, calc_func=functions[distance_metric], method=clustering_method, text="RePrints")
             )
         else:
             return {}, {}

@@ -300,26 +300,58 @@ def update_graph(init_load, selected_file, n_clicks, current_page, selected_sign
         for signature in visible_signatures:
             plots.append(
                 dbc.Row([
-                    dbc.Col(
+                    dbc.Col([
+                        # Original signature plot with PNG download button
                         dcc.Graph(
+                            id=f'graph-original-{signature.replace(" ", "_").replace("-", "_")}',
                             figure=create_main_dashboard(
                                 df_signatures,
                                 signature=signature,
-                                title=f'{signature} Frequency of Specific Tri-nucleotide Context Mutations by Mutation Type',
+                                title=f'{signature}',
                                 yaxis_title='Frequencies'
-                            )
-                        ), width=6
-                    ),
-                    dbc.Col(
+                            ),
+                            config={
+                                'displayModeBar': True,
+                                'displaylogo': False,
+                                'modeBarButtonsToAdd': [
+                                    'toImage'
+                                ],
+                                'toImageButtonOptions': {
+                                    'format': 'png',
+                                    'filename': f'{signature}_plot',
+                                    'height': 600,
+                                    'width': 800,
+                                    'scale': 2
+                                }
+                            }
+                        ),
+                    ], width=6),
+                    dbc.Col([
+                        # RePrint plot with PNG download button
                         dcc.Graph(
+                            id=f'graph-reprint-{signature.replace(" ", "_").replace("-", "_")}',
                             figure=create_main_dashboard(
                                 df_reprint,
                                 signature=signature,
-                                title=f'Reprint_{signature} - Probabilities of Specific Tri-nucleotide Context Mutations by Mutation Type',
+                                title=f'RePrint_{signature}',
                                 yaxis_title='Probabilites'
-                            )
-                        ), width=6
-                    )
+                            ),
+                            config={
+                                'displayModeBar': True,
+                                'displaylogo': False,
+                                'modeBarButtonsToAdd': [
+                                    'toImage'
+                                ],
+                                'toImageButtonOptions': {
+                                    'format': 'png',
+                                    'filename': f'Reprint_{signature}_plot',
+                                    'height': 600,
+                                    'width': 800,
+                                    'scale': 2
+                                }
+                            }
+                        ),
+                    ], width=6)
                 ])
             )
 
