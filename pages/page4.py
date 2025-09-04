@@ -6,6 +6,7 @@ import dash_bootstrap_components as dbc
 from pages.nav import navbar
 import pandas as pd
 import dash
+import plotly.graph_objects as go
 
 functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine}
 
@@ -490,3 +491,115 @@ def toggle_collapse(n, is_open):
     if n:
         return not is_open
     return is_open
+
+
+@app.callback(
+    [Output('heatmap-plot-4', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot-4', 'figure', allow_duplicate=True)],
+    [Input('distance-metric-4', 'value'),
+     Input('clustering-method-4', 'value'),
+     Input('epsilon-4', 'value')],
+    prevent_initial_call=True
+)
+def clear_plots_on_parameter_change(distance_metric, clustering_method, epsilon):
+    """Clear plots when parameters change to avoid showing outdated data"""
+    empty_fig = go.Figure()
+    empty_fig.update_layout(
+        xaxis={'visible': False},
+        yaxis={'visible': False},
+        annotations=[{
+            'text': 'Click "Generate plots" to create new dendrograms',
+            'xref': 'paper',
+            'yref': 'paper',
+            'x': 0.5,
+            'y': 0.5,
+            'showarrow': False,
+            'font': {'size': 16, 'color': '#666'}
+        }],
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)'
+    )
+    return empty_fig, empty_fig
+
+
+@app.callback(
+    [Output('heatmap-plot-4', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot-4', 'figure', allow_duplicate=True)],
+    Input('signatures-dropdown-4', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_signature_change(selected_signatures):
+    """Clear plots when signature selection changes to avoid showing outdated data"""
+    empty_fig = go.Figure()
+    empty_fig.update_layout(
+        xaxis={'visible': False},
+        yaxis={'visible': False},
+        annotations=[{
+            'text': 'Click "Generate plots" to create new dendrograms',
+            'xref': 'paper',
+            'yref': 'paper',
+            'x': 0.5,
+            'y': 0.5,
+            'showarrow': False,
+            'font': {'size': 16, 'color': '#666'}
+        }],
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)'
+    )
+    return empty_fig, empty_fig
+
+
+@app.callback(
+    [Output('heatmap-plot-4', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot-4', 'figure', allow_duplicate=True)],
+    Input('dropdown-4', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_file_change(selected_file):
+    """Clear plots when reference file changes to avoid showing outdated data"""
+    empty_fig = go.Figure()
+    empty_fig.update_layout(
+        xaxis={'visible': False},
+        yaxis={'visible': False},
+        annotations=[{
+            'text': 'Click "Generate plots" to create new dendrograms',
+            'xref': 'paper',
+            'yref': 'paper',
+            'x': 0.5,
+            'y': 0.5,
+            'showarrow': False,
+            'font': {'size': 16, 'color': '#666'}
+        }],
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)'
+    )
+    return empty_fig, empty_fig
+
+
+@app.callback(
+    [Output('heatmap-plot-4', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot-4', 'figure', allow_duplicate=True)],
+    Input('session-4-signatures', 'data'),
+    prevent_initial_call=True
+)
+def clear_plots_on_upload(uploaded_data):
+    """Clear plots when new signatures are uploaded to avoid showing outdated data"""
+    if uploaded_data is not None:
+        empty_fig = go.Figure()
+        empty_fig.update_layout(
+            xaxis={'visible': False},
+            yaxis={'visible': False},
+            annotations=[{
+                'text': 'Click "Generate plots" to create new dendrograms',
+                'xref': 'paper',
+                'yref': 'paper',
+                'x': 0.5,
+                'y': 0.5,
+                'showarrow': False,
+                'font': {'size': 16, 'color': '#666'}
+            }],
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)'
+        )
+        return empty_fig, empty_fig
+    return dash.no_update, dash.no_update

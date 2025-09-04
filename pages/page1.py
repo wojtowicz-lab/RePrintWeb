@@ -5,6 +5,7 @@ from dash import dcc, html, Input, Output, State, ctx
 import dash_bootstrap_components as dbc
 from pages.nav import navbar
 import pandas as pd
+import plotly.graph_objects as go
 
 
 
@@ -490,3 +491,32 @@ def highlight_button_on_dropdown_change(dropdown_values, n_clicks):
     elif ctx.triggered_id == "submit-button":
         return "primary", {"display": "none"}
     return dash.no_update, dash.no_update
+
+
+@app.callback(
+    [Output('heatmap-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+    [Input('distance-metric', 'value'),
+     Input('clustering-method', 'value'),
+     Input('epsilon', 'value')],
+    prevent_initial_call=True
+)
+def clear_plots_on_parameter_change(distance_metric, clustering_method, epsilon):
+    """Clear plots when parameters change to avoid showing outdated data"""
+    empty_fig = go.Figure()
+    empty_fig.update_layout(
+        xaxis={'visible': False},
+        yaxis={'visible': False},
+        annotations=[{
+            'text': 'Click "Reload heatmaps" to generate new plots',
+            'xref': 'paper',
+            'yref': 'paper',
+            'x': 0.5,
+            'y': 0.5,
+            'showarrow': False,
+            'font': {'size': 16, 'color': '#666'}
+        }],
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)'
+    )
+    return empty_fig, empty_fig

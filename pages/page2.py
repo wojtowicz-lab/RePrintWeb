@@ -7,6 +7,7 @@ from pages.nav import navbar
 import pandas as pd
 from utils.utils import FILES, DEFAULT_SIGNATURES, reprint, parse_signatures
 import dash
+import plotly.graph_objects as go
 
 
 data = {}
@@ -497,3 +498,73 @@ def highlight_reload_button(signatures_selected, reload_clicks):
     elif ctx.triggered_id == "reload-button":
         return "success", {"display": "none"}
     return dash.no_update, dash.no_update
+
+
+@app.callback(
+    Output('plots-container-2', 'children', allow_duplicate=True),
+    Input('epsilon-2', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_parameter_change(epsilon):
+    """Clear plots when epsilon parameter changes to avoid showing outdated data"""
+    return html.Div([
+        dbc.Alert([
+            html.H5("Parameters Changed", className="alert-heading"),
+            html.P("The epsilon parameter has been modified. Click 'Generate Plots' to refresh the visualizations with the new settings."),
+            html.Hr(),
+            html.P("This ensures that the displayed data matches your current parameter configuration.", className="mb-0")
+        ], color="info", className="text-center")
+    ], className="text-center")
+
+
+@app.callback(
+    Output('plots-container-2', 'children', allow_duplicate=True),
+    Input('signatures-dropdown-2', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_signature_change(selected_signatures):
+    """Clear plots when signature selection changes to avoid showing outdated data"""
+    return html.Div([
+        dbc.Alert([
+            html.H5("Signature Selection Changed", className="alert-heading"),
+            html.P("The signature selection has been modified. Click 'Generate Plots' to refresh the visualizations with the new selection."),
+            html.Hr(),
+            html.P("This ensures that the displayed data matches your current signature selection.", className="mb-0")
+        ], color="warning", className="text-center")
+    ], className="text-center")
+
+
+@app.callback(
+    Output('plots-container-2', 'children', allow_duplicate=True),
+    Input('dropdown-2', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_file_change(selected_file):
+    """Clear plots when reference file changes to avoid showing outdated data"""
+    return html.Div([
+        dbc.Alert([
+            html.H5("Reference File Changed", className="alert-heading"),
+            html.P("The reference signature file has been changed. Click 'Generate Plots' to refresh the visualizations with the new reference data."),
+            html.Hr(),
+            html.P("This ensures that the displayed data matches your current reference file selection.", className="mb-0")
+        ], color="primary", className="text-center")
+    ], className="text-center")
+
+
+@app.callback(
+    Output('plots-container-2', 'children', allow_duplicate=True),
+    Input('session-2-signatures', 'data'),
+    prevent_initial_call=True
+)
+def clear_plots_on_upload(uploaded_data):
+    """Clear plots when new signatures are uploaded to avoid showing outdated data"""
+    if uploaded_data is not None:
+        return html.Div([
+            dbc.Alert([
+                html.H5("New Signatures Uploaded", className="alert-heading"),
+                html.P("New signature data has been uploaded. Click 'Generate Plots' to refresh the visualizations with the new data."),
+                html.Hr(),
+                html.P("This ensures that the displayed data matches your uploaded signature file.", className="mb-0")
+            ], color="success", className="text-center")
+        ], className="text-center")
+    return dash.no_update
