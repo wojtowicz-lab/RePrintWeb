@@ -1,4 +1,4 @@
-from utils.utils import parse_signatures, FILES, DEFAULT_SIGNATURES, calculate_rmse, calculate_cosine, reprint
+from utils.utils import parse_signatures, FILES, DEFAULT_SIGNATURES, calculate_rmse, calculate_cosine, calculate_kl_divergence, calculate_js_divergence, reprint
 from utils.figpanel import create_vertical_dendrogram_with_query_labels_right
 from dash import dcc, html, Input, Output, State
 from main import app
@@ -8,7 +8,7 @@ import pandas as pd
 import dash
 import plotly.graph_objects as go
 
-functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine}
+functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
 
 DEFAULT_LINKAGE_METHOD = 'complete'
 linkage_methods = ['single', 'complete', 'average', 'weighted', 'centroid', 'median']
@@ -63,8 +63,16 @@ page4_layout = html.Div([
 
             html.P(
                 "In short, you can use your uploaded query signatures to 'ask a question' of the reference base — "
-                "e.g., “Which known signature is most similar to my experimental sample?”"
-            )
+                "e.g., 'Which known signature is most similar to my experimental sample?'"
+            ),
+
+            html.H6("Distance Metrics", style={"font-weight": "bold", "margin-top": "15px"}),
+            html.P("The analysis supports multiple distance metrics for comparing signatures:"),
+            html.Ul([
+                html.Li("Cosine: Measures angular similarity between signature vectors", style={"font-size": "14px"}),
+                html.Li("RMSE: Root mean square error between normalized signatures", style={"font-size": "14px"}),
+                html.Li("JS Divergence: Jensen-Shannon divergence (symmetric version of Kullback-Leibler divergence)", style={"font-size": "14px"}),
+            ])
         ],
         color="secondary",
         style={"margin-top": "20px", "font-size": "15px", "background-color": "#f8f9fa", "border": "1px solid #ced4da"},
@@ -173,7 +181,8 @@ page4_layout = html.Div([
                                 id='distance-metric-4',
                                 options=[
                                     {'label': 'Cosine', 'value': 'cosine'},
-                                    {'label': 'RMSE', 'value': 'rmse'}
+                                    {'label': 'RMSE', 'value': 'rmse'},
+                                    {'label': 'JS Divergence', 'value': 'js_divergence'}
                                 ],
                                 placeholder="Select distance metric",
                                 value='rmse',
