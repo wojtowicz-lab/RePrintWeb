@@ -1,10 +1,11 @@
 from utils.figpanel import create_heatmap_with_custom_sim
-from utils.utils import FILES, DEFAULT_SIGNATURES, linkage_methods, DEFAULT_LINKAGE_METHOD, reprint, calculate_rmse, calculate_cosine
+from utils.utils import FILES, DEFAULT_SIGNATURES, linkage_methods, DEFAULT_LINKAGE_METHOD, reprint, calculate_rmse, calculate_cosine, calculate_js_divergence
 from main import app
 from dash import dcc, html, Input, Output, State, ctx
 import dash_bootstrap_components as dbc
 from pages.nav import navbar
 import pandas as pd
+import plotly.graph_objects as go
 
 
 
@@ -35,6 +36,13 @@ page1_layout = html.Div([
                 ])
             ], style={"font-size": "15px"}),
 
+
+            html.H6("Distance Metrics", className="mt-4"),
+            html.Ul([
+                html.Li("Cosine: Measures angular similarity between signatures", style={"font-size": "14px"}),
+                html.Li("RMSE: Root mean square error between normalized signatures", style={"font-size": "14px"}),
+                html.Li("JS Divergence: Jensen-Shannon divergence (symmetric version of Kullback-Leibler divergence)", style={"font-size": "14px"}),
+            ]),
 
             html.H6("Downloads", className="mt-4"),
             html.Ul([
@@ -138,7 +146,8 @@ page1_layout = html.Div([
                                 id='distance-metric',
                                 options=[
                                     {'label': 'Cosine', 'value': 'cosine'},
-                                    {'label': 'RMSE', 'value': 'rmse'}
+                                    {'label': 'RMSE', 'value': 'rmse'},
+                                    {'label': 'JS Divergence', 'value': 'js_divergence'}
                                 ],
                                 placeholder="Select distance metric",
                                 value='rmse',
@@ -247,19 +256,51 @@ page1_layout = html.Div([
     ], className="mb-4"),
     dbc.Row([
         dbc.Col([
-            html.H5("Signature similarity"),
+            html.H5("Signature Similarity"),
             dcc.Loading(
                 id="loading-heatmap-plot",
                 type="default",
-                children=dcc.Graph(id='heatmap-plot')
+                children=dcc.Graph(
+                    id='heatmap-plot',
+                    config={
+                        'displayModeBar': True,
+                        'displaylogo': False,
+                        'modeBarButtonsToAdd': [
+                            'toImage'
+                        ],
+                        'toImageButtonOptions': {
+                            'format': 'png',
+                            'filename': 'signature_similarity_heatmap',
+                            'height': 600,
+                            'width': 800,
+                            'scale': 2
+                        }
+                    }
+                )
             )
         ]),
         dbc.Col([
-            html.H5("RePrint similarity"),
+            html.H5("RePrint Similarity"),
             dcc.Loading(
                 id="loading-heatmap-reprint-plot",
                 type="default",
-                children=dcc.Graph(id='heatmap-reprint-plot')
+                children=dcc.Graph(
+                    id='heatmap-reprint-plot',
+                    config={
+                        'displayModeBar': True,
+                        'displaylogo': False,
+                        'modeBarButtonsToAdd': [
+                            'toImage'
+                        ],
+                        'toImageButtonOptions': {
+                            'format': 'png',
+                            'filename': 'reprint_similarity_heatmap',
+                            'height': 600,
+                            'width': 800,
+                            'scale': 2
+                        }
+                    }
+                )
             )
         ])
     ]),
@@ -334,7 +375,7 @@ def update_output(n_clicks, hide_heatmap, selected_file, selected_signatures, di
             data = pd.DataFrame(signatures['signatures_data'])
             data.index = data['Type']
             data = data.drop(columns='Type')[selected_signatures]
-            functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine}
+            functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
             df_reprint = reprint(data, epsilon=epsilon)
             return (f'Submitted: Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
                     create_heatmap_with_custom_sim(data, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
@@ -342,7 +383,7 @@ def update_output(n_clicks, hide_heatmap, selected_file, selected_signatures, di
                     )
         else:
             df_signatures = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)[selected_signatures]
-            functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine}
+            functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
             df_reprint = reprint(df_signatures, epsilon=epsilon)
             return (f'Submitted: Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
                     create_heatmap_with_custom_sim(df_signatures, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
@@ -353,7 +394,7 @@ def update_output(n_clicks, hide_heatmap, selected_file, selected_signatures, di
             data = pd.DataFrame(signatures['signatures_data'])
             data.index = data['Type']
             data = data.drop(columns='Type')[selected_signatures]
-            functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine}
+            functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
             df_reprint = reprint(data, epsilon=epsilon)
             return (f'Submitted: Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
                     create_heatmap_with_custom_sim(data, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
@@ -458,3 +499,32 @@ def highlight_button_on_dropdown_change(dropdown_values, n_clicks):
     elif ctx.triggered_id == "submit-button":
         return "primary", {"display": "none"}
     return dash.no_update, dash.no_update
+
+
+@app.callback(
+    [Output('heatmap-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+    [Input('distance-metric', 'value'),
+     Input('clustering-method', 'value'),
+     Input('epsilon', 'value')],
+    prevent_initial_call=True
+)
+def clear_plots_on_parameter_change(distance_metric, clustering_method, epsilon):
+    """Clear plots when parameters change to avoid showing outdated data"""
+    empty_fig = go.Figure()
+    empty_fig.update_layout(
+        xaxis={'visible': False},
+        yaxis={'visible': False},
+        annotations=[{
+            'text': 'Click "Reload heatmaps" to generate new plots',
+            'xref': 'paper',
+            'yref': 'paper',
+            'x': 0.5,
+            'y': 0.5,
+            'showarrow': False,
+            'font': {'size': 16, 'color': '#666'}
+        }],
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)'
+    )
+    return empty_fig, empty_fig

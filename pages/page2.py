@@ -7,6 +7,7 @@ from pages.nav import navbar
 import pandas as pd
 from utils.utils import FILES, DEFAULT_SIGNATURES, reprint, parse_signatures
 import dash
+import plotly.graph_objects as go
 
 
 data = {}
@@ -203,16 +204,23 @@ dbc.Alert(
     ),
     dcc.Upload(
             id='upload-data-2-signatures',
-            children=html.Div(['Drag and drop your signatures']),
+            children=html.Div([
+                html.Div('📁 Drag and drop your signatures here', style={'fontWeight': 'bold', 'marginBottom': '5px'}),
+                html.Div('or click to browse files', style={'fontSize': '12px', 'color': '#666'}),
+                html.Div('(.txt format, tab-separated)', style={'fontSize': '11px', 'color': '#888', 'fontStyle': 'italic'})
+            ]),
             style={
-                'width': '300px',
-                'height': '60px',
-                'lineHeight': '60px',
-                'borderWidth': '1px',
+                'width': '350px',
+                'height': '80px',
+                'lineHeight': '25px',
+                'borderWidth': '2px',
                 'borderStyle': 'dashed',
-                'borderRadius': '5px',
+                'borderRadius': '8px',
                 'textAlign': 'center',
-                'margin': '10px'
+                'margin': '10px',
+                'backgroundColor': '#f8f9fa',
+                'borderColor': '#007bff',
+                'cursor': 'pointer'
             },
             multiple=False
     ),
@@ -293,26 +301,58 @@ def update_graph(init_load, selected_file, n_clicks, current_page, selected_sign
         for signature in visible_signatures:
             plots.append(
                 dbc.Row([
-                    dbc.Col(
+                    dbc.Col([
+                        # Original signature plot with PNG download button
                         dcc.Graph(
+                            id=f'graph-original-{signature.replace(" ", "_").replace("-", "_")}',
                             figure=create_main_dashboard(
                                 df_signatures,
                                 signature=signature,
-                                title=f'{signature} Frequency of Specific Tri-nucleotide Context Mutations by Mutation Type',
+                                title=f'{signature}',
                                 yaxis_title='Frequencies'
-                            )
-                        ), width=6
-                    ),
-                    dbc.Col(
+                            ),
+                            config={
+                                'displayModeBar': True,
+                                'displaylogo': False,
+                                'modeBarButtonsToAdd': [
+                                    'toImage'
+                                ],
+                                'toImageButtonOptions': {
+                                    'format': 'png',
+                                    'filename': f'{signature}_plot',
+                                    'height': 600,
+                                    'width': 800,
+                                    'scale': 2
+                                }
+                            }
+                        ),
+                    ], width=6),
+                    dbc.Col([
+                        # RePrint plot with PNG download button
                         dcc.Graph(
+                            id=f'graph-reprint-{signature.replace(" ", "_").replace("-", "_")}',
                             figure=create_main_dashboard(
                                 df_reprint,
                                 signature=signature,
-                                title=f'Reprint_{signature} - Probabilities of Specific Tri-nucleotide Context Mutations by Mutation Type',
+                                title=f'RePrint_{signature}',
                                 yaxis_title='Probabilites'
-                            )
-                        ), width=6
-                    )
+                            ),
+                            config={
+                                'displayModeBar': True,
+                                'displaylogo': False,
+                                'modeBarButtonsToAdd': [
+                                    'toImage'
+                                ],
+                                'toImageButtonOptions': {
+                                    'format': 'png',
+                                    'filename': f'Reprint_{signature}_plot',
+                                    'height': 600,
+                                    'width': 800,
+                                    'scale': 2
+                                }
+                            }
+                        ),
+                    ], width=6)
                 ])
             )
 
@@ -458,3 +498,73 @@ def highlight_reload_button(signatures_selected, reload_clicks):
     elif ctx.triggered_id == "reload-button":
         return "success", {"display": "none"}
     return dash.no_update, dash.no_update
+
+
+@app.callback(
+    Output('plots-container-2', 'children', allow_duplicate=True),
+    Input('epsilon-2', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_parameter_change(epsilon):
+    """Clear plots when epsilon parameter changes to avoid showing outdated data"""
+    return html.Div([
+        dbc.Alert([
+            html.H5("Parameters Changed", className="alert-heading"),
+            html.P("The epsilon parameter has been modified. Click 'Generate Plots' to refresh the visualizations with the new settings."),
+            html.Hr(),
+            html.P("This ensures that the displayed data matches your current parameter configuration.", className="mb-0")
+        ], color="info", className="text-center")
+    ], className="text-center")
+
+
+@app.callback(
+    Output('plots-container-2', 'children', allow_duplicate=True),
+    Input('signatures-dropdown-2', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_signature_change(selected_signatures):
+    """Clear plots when signature selection changes to avoid showing outdated data"""
+    return html.Div([
+        dbc.Alert([
+            html.H5("Signature Selection Changed", className="alert-heading"),
+            html.P("The signature selection has been modified. Click 'Generate Plots' to refresh the visualizations with the new selection."),
+            html.Hr(),
+            html.P("This ensures that the displayed data matches your current signature selection.", className="mb-0")
+        ], color="warning", className="text-center")
+    ], className="text-center")
+
+
+@app.callback(
+    Output('plots-container-2', 'children', allow_duplicate=True),
+    Input('dropdown-2', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_file_change(selected_file):
+    """Clear plots when reference file changes to avoid showing outdated data"""
+    return html.Div([
+        dbc.Alert([
+            html.H5("Reference File Changed", className="alert-heading"),
+            html.P("The reference signature file has been changed. Click 'Generate Plots' to refresh the visualizations with the new reference data."),
+            html.Hr(),
+            html.P("This ensures that the displayed data matches your current reference file selection.", className="mb-0")
+        ], color="primary", className="text-center")
+    ], className="text-center")
+
+
+@app.callback(
+    Output('plots-container-2', 'children', allow_duplicate=True),
+    Input('session-2-signatures', 'data'),
+    prevent_initial_call=True
+)
+def clear_plots_on_upload(uploaded_data):
+    """Clear plots when new signatures are uploaded to avoid showing outdated data"""
+    if uploaded_data is not None:
+        return html.Div([
+            dbc.Alert([
+                html.H5("New Signatures Uploaded", className="alert-heading"),
+                html.P("New signature data has been uploaded. Click 'Generate Plots' to refresh the visualizations with the new data."),
+                html.Hr(),
+                html.P("This ensures that the displayed data matches your uploaded signature file.", className="mb-0")
+            ], color="success", className="text-center")
+        ], className="text-center")
+    return dash.no_update

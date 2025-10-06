@@ -37,7 +37,13 @@ def create_main_dashboard(df, signature, title, yaxis_title):
     y_max = frequencies.max()
 
     fig.update_layout(
-        title=title,
+        title=dict(
+            text=title,
+            x=0.5,
+            xanchor='center',
+            font=dict(size=12),
+            y=0.95
+        ),
         xaxis_title='Mutation Context',
         yaxis_title=yaxis_title,
         xaxis_tickangle=-90,
@@ -45,7 +51,7 @@ def create_main_dashboard(df, signature, title, yaxis_title):
         barmode='group',
         legend_title='Mutation Type',
         yaxis_range=[0, y_max], 
-        margin=dict(l=50, r=50, t=50, b=150),
+        margin=dict(l=50, r=50, t=80, b=150),
         xaxis=dict(tickfont=dict(size=8)),
         yaxis=dict(tickfont=dict(size=10))
     )
@@ -132,6 +138,7 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
 
     fig.update_layout({'width': 700, 'height': 700,
                        'showlegend': False, 'hovermode': 'closest',
+                       'margin': dict(l=50, r=50, t=60, b=50),  # Reduced top margin
                        })
     fig.update_layout(yaxis={'domain': [0, 1],
                              'mirror': False,
@@ -210,17 +217,39 @@ def create_vertical_dendrogram_with_query_labels_right(df, calc_func=calculate_r
             label = ref
         updated_labels.append(label)
 
+    # Calculate responsive dimensions
+    num_labels = len(updated_labels)
+    min_height = max(400, 25 * num_labels)  # Reduced from 30 to 25 per label
+    max_height = min(800, min_height)  # Cap maximum height
+    
+    # Make width responsive and ensure it fits within the card
+    responsive_width = min(1000, max(600, 15 * len(max(updated_labels, key=len))))
+    
     fig.update_layout(
         yaxis=dict(
             ticktext=updated_labels,
             tickvals=fig['layout']['yaxis']['tickvals'],
-            tickfont=dict(size=10)
+            tickfont=dict(size=9),  # Reduced font size
+            tickangle=0
         ),
-        width=1200,
-        height=max(400, 30 * len(updated_labels)),
-        margin=dict(l=50, r=350, t=40, b=40),
-        title=text,
-        font=dict(size=10)
+        width=responsive_width,
+        height=max_height,
+        margin=dict(l=50, r=200, t=60, b=40),  # Reduced top margin
+        title=dict(
+            text=text,
+            x=0.5,
+            xanchor='center',
+            font=dict(size=12),  # Reduced title font size
+            y=0.95
+        ),
+        font=dict(size=9),  # Reduced general font size
+        autosize=True,  # Enable autosize
+        # Ensure the plot fits within its container
+        xaxis=dict(
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray'
+        )
     )
 
     return fig

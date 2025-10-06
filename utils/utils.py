@@ -37,10 +37,59 @@ def calculate_rmse(x, y):
 def calculate_cosine(x, y):
     return 1-np.dot(x, y) / (np.sqrt(np.dot(x, x)) * np.sqrt(np.dot(y, y)))
 
+def calculate_kl_divergence(x, y):
+    """
+    Calculate KL divergence between two signature vectors.
+    Normalizes vectors to probabilities before computation.
+    """
+    # Normalize to probabilities
+    x_prob = x / np.sum(x) if np.sum(x) > 0 else x
+    y_prob = y / np.sum(y) if np.sum(y) > 0 else y
+    
+    return kl_divergence(x_prob, y_prob)
+
+def calculate_js_divergence(x, y):
+    """
+    Calculate Jensen-Shannon divergence between two signature vectors.
+    Normalizes vectors to probabilities before computation.
+    """
+    # Normalize to probabilities
+    x_prob = x / np.sum(x) if np.sum(x) > 0 else x
+    y_prob = y / np.sum(y) if np.sum(y) > 0 else y
+    
+    return js_divergence(x_prob, y_prob)
+
+
+
+def kl_divergence(p, q):
+    """
+    Computes the Kullback–Leibler divergence D_KL(P || Q).
+    Assumes that p and q are probability vectors (summing to 1).
+    """
+    p = np.asarray(p, dtype=np.float64)
+    q = np.asarray(q, dtype=np.float64)
+    
+    # Small offset to avoid division by zero
+    eps = 1e-12
+    p = np.clip(p, eps, 1)
+    q = np.clip(q, eps, 1)
+    
+    return np.sum(p * np.log(p / q))
+
+def js_divergence(p, q):
+    """
+    Computes the Jensen–Shannon divergence (a symmetric version of KL).
+    """
+    p = np.asarray(p, dtype=np.float64)
+    q = np.asarray(q, dtype=np.float64)
+    m = 0.5 * (p + q)
+    return 0.5 * kl_divergence(p, m) + 0.5 * kl_divergence(q, m)
+
+
 def reprint(data, epsilon=10e-4):
     # Extracting mutation categories and their probabilities
     mutation_types = data.index
-    signatures = data.columns[0:]
+    signatures = data.columns
 
     # Initialize a dictionary to store the RePrint probabilities for each signature
     reprint_probabilities = {signature: {} for signature in signatures}
@@ -94,7 +143,15 @@ def parse_signatures(contents, filename):
         if 'Type' not in df.columns:
             raise ValueError("Uploaded file must include a 'Type' column.")
 
+        # Dodatkowe sprawdzenie danych
+        print(f"Parsed file: {filename}")
+        print(f"Columns: {df.columns.tolist()}")
+        print(f"Shape: {df.shape}")
+        print(f"First few rows:")
+        print(df.head())
+
         return df
 
     except Exception as e:
+        print(f"Error parsing file {filename}: {str(e)}")
         raise ValueError(f"Error while parsing file {filename}: {str(e)}")

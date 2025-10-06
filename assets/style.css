@@ -6,3 +6,29 @@
 .custom-option:hover {
     background-color: #cde0f7;
 }
+
+/* Ensure dendrogram plots are properly contained */
+.dendrogram-container {
+    overflow: hidden;
+    max-width: 100%;
+}
+
+.dendrogram-container .js-plotly-plot {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* Ensure cards properly contain their content */
+.card {
+    overflow: hidden;
+}
+
+.card-body {
+    overflow: hidden;
+}
+
+/* Make graphs responsive */
+.dash-graph {
+    max-width: 100%;
+    overflow: hidden;
+}
