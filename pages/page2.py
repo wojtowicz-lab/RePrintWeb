@@ -1,4 +1,4 @@
-from utils.figpanel import create_main_dashboard
+from utils.figpanel import create_main_dashboard, create_reprint_footprint_figure
 from dash import dcc, html
 from main import app
 from dash import Input, Output, State
@@ -328,14 +328,13 @@ def update_graph(init_load, selected_file, n_clicks, current_page, selected_sign
                         ),
                     ], width=6),
                     dbc.Col([
-                        # RePrint plot with PNG download button
+                        # RePrint footprint plot with PNG download button
                         dcc.Graph(
                             id=f'graph-reprint-{signature.replace(" ", "_").replace("-", "_")}',
-                            figure=create_main_dashboard(
+                            figure=create_reprint_footprint_figure(
                                 df_reprint,
                                 signature=signature,
                                 title=f'RePrint_{signature}',
-                                yaxis_title='Probabilites'
                             ),
                             config={
                                 'displayModeBar': True,

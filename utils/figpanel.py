@@ -1,24 +1,38 @@
 import plotly.figure_factory as ff
 from scipy.spatial.distance import squareform
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from utils.utils import calculate_rmse
 from scipy.cluster.hierarchy import linkage
 import numpy as np
 
+
+# Shared color and context configuration for 96-context plots
+BASES = ['A', 'C', 'G', 'T']
+MUTATIONS = ['C>A', 'C>G', 'C>T', 'T>A', 'T>C', 'T>G']
+CONTEXTS = [f'{x}[{m}]{y}' for m in MUTATIONS for x in BASES for y in BASES]
+
+COLORS_C = ['blue', 'black', 'red']   # C>A, C>G, C>T
+COLORS_T = ['gray', 'green', 'pink']  # T>A, T>C, T>G
+
+BASES_CTX = ['A', 'C', 'G', 'T']
+C_CONTEXT_LABELS = [f"{l}C{r}" for l in BASES_CTX for r in BASES_CTX]
+T_CONTEXT_LABELS = [f"{l}T{r}" for l in BASES_CTX for r in BASES_CTX]
+ALL_CONTEXT_LABELS = C_CONTEXT_LABELS + T_CONTEXT_LABELS
+
 def create_main_dashboard(df, signature, title, yaxis_title):
     frequencies = df[signature] * 1
 
-    mutations = ['C>A', 'C>G', 'C>T', 'T>A', 'T>C', 'T>G']
-    bases = ['A', 'C', 'G', 'T']
-    contexts = [f'{x}[{m}]{y}' for m in mutations for x in bases for y in bases]
+    mutations = MUTATIONS
+    contexts = CONTEXTS
 
     colors = {
-        'C>A': 'blue',
-        'C>G': 'black',
-        'C>T': 'red',
-        'T>A': 'gray',
-        'T>C': 'green',
-        'T>G': 'pink'
+        'C>A': COLORS_C[0],
+        'C>G': COLORS_C[1],
+        'C>T': COLORS_C[2],
+        'T>A': COLORS_T[0],
+        'T>C': COLORS_T[1],
+        'T>G': COLORS_T[2],
     }
 
     fig = go.Figure()
@@ -55,6 +69,236 @@ def create_main_dashboard(df, signature, title, yaxis_title):
         xaxis=dict(tickfont=dict(size=8)),
         yaxis=dict(tickfont=dict(size=10))
     )
+
+    return fig
+
+
+def _extract_reprint_vector_from_series(series):
+    """
+    Convert a 96-context RePrint Series into C and T probability matrices.
+
+    Expects index like 'A[C>A]A', 'A[C>A]C', ..., with values as probabilities.
+    Returns:
+        c_probs: (16, 3) array for C>A, C>G, C>T
+        t_probs: (16, 3) array for T>A, T>C, T>G
+    """
+    c_probs = np.zeros((16, 3))
+    t_probs = np.zeros((16, 3))
+
+    bases_list = BASES_CTX
+
+    for idx, value in series.items():
+        # idx: L[X>Y]R
+        try:
+            parts = idx.split('[')
+            left_base = parts[0]
+            mutation_and_right = parts[1].split(']')
+            mutation = mutation_and_right[0]
+            right_base = mutation_and_right[1]
+        except Exception:
+            # Skip malformed indices silently
+            continue
+
+        ref_base, mut_base = mutation.split('>')
+
+        left_idx = bases_list.index(left_base)
+        right_idx = bases_list.index(right_base)
+        context_idx = left_idx * 4 + right_idx
+
+        if ref_base == 'C':
+            mut_order = ['A', 'G', 'T']  # C>A, C>G, C>T
+            mut_idx = mut_order.index(mut_base)
+            c_probs[context_idx, mut_idx] = float(value)
+        elif ref_base == 'T':
+            mut_order = ['A', 'C', 'G']  # T>A, T>C, T>G
+            mut_idx = mut_order.index(mut_base)
+            t_probs[context_idx, mut_idx] = float(value)
+
+    return c_probs, t_probs
+
+
+def create_reprint_footprint_figure(df_reprint, signature, title=None, show_x_labels=True):
+    """
+    Create a three-panel RePrint footprint figure matching the standalone Plotly script,
+    but driven directly from the RePrint DataFrame used in the app.
+
+    df_reprint: DataFrame with 96-context index and RePrint signatures as columns
+    signature: column name to plot
+    """
+    if signature not in df_reprint.columns:
+        raise ValueError(f"Signature '{signature}' not found in RePrint data")
+
+    series = df_reprint[signature]
+    c_probs, t_probs = _extract_reprint_vector_from_series(series)
+
+    # X positions with a gap
+    x_pos_c = np.arange(16)
+    x_pos_t = np.arange(16) + 16.5
+    x_pos = np.concatenate([x_pos_c, x_pos_t])
+
+    # Tick labels
+    if show_x_labels:
+        ticktext = ALL_CONTEXT_LABELS
+        tickvals = x_pos
+    else:
+        ticktext, tickvals = [], []
+
+    if title is None:
+        title = f"{signature} RePrint"
+
+    fig = make_subplots(
+        rows=3, cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.00,
+        row_heights=[0.33, 0.34, 0.33],
+    )
+
+    width = 0.95
+
+    # Bottom panel (row 3): C>A and T>A from 0 up
+    fig.add_trace(
+        go.Bar(
+            x=x_pos_c, y=c_probs[:, 0],
+            width=width, marker=dict(color=COLORS_C[0], line=dict(color="white", width=0.5)),
+            name="C>A", legendgroup="C", showlegend=True,
+            hovertemplate="Context=%{customdata}<br>Mutation=C>A<br>p=%{y:.4f}<extra></extra>",
+            customdata=C_CONTEXT_LABELS,
+        ),
+        row=3, col=1
+    )
+    fig.add_trace(
+        go.Bar(
+            x=x_pos_t, y=t_probs[:, 0],
+            width=width, marker=dict(color=COLORS_T[0], line=dict(color="white", width=0.5)),
+            name="T>A", legendgroup="T", showlegend=True,
+            hovertemplate="Context=%{customdata}<br>Mutation=T>A<br>p=%{y:.4f}<extra></extra>",
+            customdata=T_CONTEXT_LABELS,
+        ),
+        row=3, col=1
+    )
+
+    # Middle panel (row 2): centered bars
+    c_hm = c_probs[:, 1]
+    t_hm = t_probs[:, 1]
+    fig.add_trace(
+        go.Bar(
+            x=x_pos_c, y=c_hm, base=-c_hm / 2,
+            width=width, marker=dict(color=COLORS_C[1], line=dict(color="white", width=0.5)),
+            name="C>G", legendgroup="C", showlegend=True,
+            hovertemplate="Context=%{customdata}<br>Mutation=C>G<br>p=%{y:.4f}<extra></extra>",
+            customdata=C_CONTEXT_LABELS,
+        ),
+        row=2, col=1
+    )
+    fig.add_trace(
+        go.Bar(
+            x=x_pos_t, y=t_hm, base=-t_hm / 2,
+            width=width, marker=dict(color=COLORS_T[1], line=dict(color="white", width=0.5)),
+            name="T>C", legendgroup="T", showlegend=True,
+            hovertemplate="Context=%{customdata}<br>Mutation=T>C<br>p=%{y:.4f}<extra></extra>",
+            customdata=T_CONTEXT_LABELS,
+        ),
+        row=2, col=1
+    )
+
+    # Top panel (row 1): inverted y-axis
+    fig.add_trace(
+        go.Bar(
+            x=x_pos_c, y=c_probs[:, 2],
+            width=width, marker=dict(color=COLORS_C[2], line=dict(color="white", width=0.5)),
+            name="C>T", legendgroup="C", showlegend=True,
+            hovertemplate="Context=%{customdata}<br>Mutation=C>T<br>p=%{y:.4f}<extra></extra>",
+            customdata=C_CONTEXT_LABELS,
+        ),
+        row=1, col=1
+    )
+    fig.add_trace(
+        go.Bar(
+            x=x_pos_t, y=t_probs[:, 2],
+            width=width, marker=dict(color=COLORS_T[2], line=dict(color="white", width=0.5)),
+            name="T>G", legendgroup="T", showlegend=True,
+            hovertemplate="Context=%{customdata}<br>Mutation=T>G<br>p=%{y:.4f}<extra></extra>",
+            customdata=T_CONTEXT_LABELS,
+        ),
+        row=1, col=1
+    )
+
+    fig.update_layout(
+        barmode="overlay",
+        title=dict(text=title, x=0.5, y=0.98, xanchor="center", yanchor="top"),
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        margin=dict(l=20, r=80, t=60, b=80),
+        height=520,
+        legend=dict(
+            x=1.02, y=1.0,
+            xanchor="left", yanchor="top",
+            bgcolor="rgba(255,255,255,0.9)",
+            bordercolor="rgba(0,0,0,0.2)",
+            borderwidth=1,
+            font=dict(size=12),
+            tracegroupgap=8,
+        ),
+    )
+
+    # X axis (only visible on bottom)
+    fig.update_xaxes(
+        row=3, col=1,
+        tickmode="array",
+        tickvals=tickvals,
+        ticktext=ticktext,
+        tickangle=90,
+        showgrid=False,
+        zeroline=False,
+        showline=False,
+        ticks="",
+    )
+    fig.update_xaxes(row=1, col=1, showticklabels=False)
+    fig.update_xaxes(row=2, col=1, showticklabels=False)
+
+    # Remove y axes; set ranges; invert top
+    fig.update_yaxes(row=3, col=1, range=[0, 1.0], visible=False)
+    fig.update_yaxes(row=2, col=1, range=[-0.5, 0.5], visible=False)
+    fig.update_yaxes(row=1, col=1, range=[1.0, 0], visible=False)
+
+    # X limits
+    max_x = float(x_pos.max())
+    for r in (1, 2, 3):
+        fig.update_xaxes(range=[-0.5, max_x + 0.5], row=r, col=1)
+
+    # Scale bar on the right (bottom panel coordinates)
+    scale_x = max_x + 1.5
+    fig.add_shape(
+        type="line",
+        x0=scale_x, x1=scale_x, y0=0, y1=1.0,
+        xref="x3", yref="y3",
+        line=dict(color="black", width=2),
+        layer="above",
+    )
+    # end caps
+    fig.add_shape(type="line", x0=scale_x - 0.1, x1=scale_x + 0.1, y0=0, y1=0,
+                  xref="x3", yref="y3", line=dict(color="black", width=2), layer="above")
+    fig.add_shape(type="line", x0=scale_x - 0.1, x1=scale_x + 0.1, y0=1.0, y1=1.0,
+                  xref="x3", yref="y3", line=dict(color="black", width=2), layer="above")
+
+    ticks = [0, 0.25, 0.5, 0.75, 1.0]
+    for y in ticks:
+        fig.add_shape(
+            type="line",
+            x0=scale_x - 0.05, x1=scale_x + 0.05, y0=y, y1=y,
+            xref="x3", yref="y3",
+            line=dict(color="black", width=1.5),
+            layer="above",
+        )
+        fig.add_annotation(
+            x=scale_x + 0.3, y=y,
+            xref="x3", yref="y3",
+            text=str(y),
+            showarrow=False,
+            xanchor="left",
+            yanchor="middle",
+            font=dict(size=12, color="black"),
+        )
 
     return fig
 
