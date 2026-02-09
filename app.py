@@ -1,5 +1,6 @@
 from dash import dcc, html
 from dash.dependencies import Input, Output
+import dash_mantine_components as dmc
 from main import *
 from pages.page1 import page1_layout
 from pages.page2 import page2_layout
@@ -7,7 +8,7 @@ from pages.page4 import page4_layout
 
 server = app.server
 
-app.layout = html.Div([
+app.layout = dmc.MantineProvider([
     dcc.Location(id='url', refresh=False),
     html.Div(id='page-content'),
 ])

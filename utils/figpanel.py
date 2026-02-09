@@ -20,6 +20,9 @@ C_CONTEXT_LABELS = [f"{l}C{r}" for l in BASES_CTX for r in BASES_CTX]
 T_CONTEXT_LABELS = [f"{l}T{r}" for l in BASES_CTX for r in BASES_CTX]
 ALL_CONTEXT_LABELS = C_CONTEXT_LABELS + T_CONTEXT_LABELS
 
+# Short axis labels for 96-context signature plot (same style as reprint: trinucleotide context)
+SIGNATURE_X_LABELS = C_CONTEXT_LABELS * 3 + T_CONTEXT_LABELS * 3  # 96 labels matching CONTEXTS order
+
 def create_main_dashboard(df, signature, title, yaxis_title):
     frequencies = df[signature] * 1
 
@@ -60,13 +63,20 @@ def create_main_dashboard(df, signature, title, yaxis_title):
         ),
         xaxis_title='Mutation Context',
         yaxis_title=yaxis_title,
-        xaxis_tickangle=-90,
         template='plotly_white',
         barmode='group',
         legend_title='Mutation Type',
-        yaxis_range=[0, y_max], 
+        yaxis_range=[0, y_max],
         margin=dict(l=50, r=50, t=80, b=150),
-        xaxis=dict(tickfont=dict(size=8)),
+        width=1000,
+        height=520,
+        xaxis=dict(
+            tickmode='array',
+            tickvals=list(range(96)),
+            ticktext=SIGNATURE_X_LABELS,
+            tickangle=90,
+            tickfont=dict(size=9),
+        ),
         yaxis=dict(tickfont=dict(size=10))
     )
 
@@ -229,6 +239,7 @@ def create_reprint_footprint_figure(df_reprint, signature, title=None, show_x_la
         paper_bgcolor="white",
         plot_bgcolor="white",
         margin=dict(l=20, r=80, t=60, b=80),
+        width=1000,
         height=520,
         legend=dict(
             x=1.02, y=1.0,
@@ -264,10 +275,10 @@ def create_reprint_footprint_figure(df_reprint, signature, title=None, show_x_la
     # X limits
     max_x = float(x_pos.max())
     for r in (1, 2, 3):
-        fig.update_xaxes(range=[-0.5, max_x + 0.5], row=r, col=1)
+        fig.update_xaxes(range=[-0.5, max_x + 0.8], row=r, col=1)
 
     # Scale bar on the right (bottom panel coordinates)
-    scale_x = max_x + 1.5
+    scale_x = max_x + 1.1
     fig.add_shape(
         type="line",
         x0=scale_x, x1=scale_x, y0=0, y1=1.0,
