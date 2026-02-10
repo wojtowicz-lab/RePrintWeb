@@ -61,3 +61,4 @@ venv.bak/
 html/
 latex/
 doxygen_sqlite3.db
+logs
