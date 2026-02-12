@@ -1,5 +1,6 @@
 from dash import dcc, html
 from dash.dependencies import Input, Output
+import dash_mantine_components as dmc
 from flask import request
 from main import *
 from pages.page1 import page1_layout

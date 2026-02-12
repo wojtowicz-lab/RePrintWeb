@@ -23,6 +23,20 @@ ALL_CONTEXT_LABELS = C_CONTEXT_LABELS + T_CONTEXT_LABELS
 # Short axis labels for 96-context signature plot (same style as reprint: trinucleotide context)
 SIGNATURE_X_LABELS = C_CONTEXT_LABELS * 3 + T_CONTEXT_LABELS * 3  # 96 labels matching CONTEXTS order
 
+# Keep legend styling consistent across all mutation plots.
+MUTATION_LEGEND = dict(
+    title=dict(text="Mutation Type"),
+    x=1.02,
+    y=1.0,
+    xanchor="left",
+    yanchor="top",
+    bgcolor="rgba(255,255,255,0.9)",
+    bordercolor="rgba(0,0,0,0.2)",
+    borderwidth=1,
+    font=dict(size=12),
+    tracegroupgap=8,
+)
+
 def create_main_dashboard(df, signature, title, yaxis_title):
     frequencies = df[signature] * 1
 
@@ -65,7 +79,7 @@ def create_main_dashboard(df, signature, title, yaxis_title):
         yaxis_title=yaxis_title,
         template='plotly_white',
         barmode='group',
-        legend_title='Mutation Type',
+        legend=MUTATION_LEGEND,
         yaxis_range=[0, y_max],
         margin=dict(l=50, r=50, t=80, b=150),
         width=1000,
@@ -241,15 +255,7 @@ def create_reprint_footprint_figure(df_reprint, signature, title=None, show_x_la
         margin=dict(l=20, r=80, t=60, b=80),
         width=1000,
         height=520,
-        legend=dict(
-            x=1.02, y=1.0,
-            xanchor="left", yanchor="top",
-            bgcolor="rgba(255,255,255,0.9)",
-            bordercolor="rgba(0,0,0,0.2)",
-            borderwidth=1,
-            font=dict(size=12),
-            tracegroupgap=8,
-        ),
+        legend=MUTATION_LEGEND,
     )
 
     # X axis (only visible on bottom)
