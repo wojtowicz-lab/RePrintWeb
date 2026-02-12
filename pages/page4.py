@@ -580,24 +580,35 @@ def update_active_file_display_4(selected_file):
     [Output("signatures-chips-container-4", "children"),
      Output("selected-signatures-store-4", "data")],
     [Input("dropdown-4", "value"),
+     Input("session-4-signatures", "data"),
      Input("signature-search-4", "value"),
      Input("add-all-btn-4", "n_clicks"),
      Input("clear-all-btn-4", "n_clicks"),
      Input("selected-signatures-store-4", "data")],
     prevent_initial_call=False
 )
-def update_signature_chips_4(selected_file, search_value, add_clicks, clear_clicks, selected_sigs):
-    """Generate signature chips based on file and search/filter. Uses _ref suffix to match df columns."""
+def update_signature_chips_4(selected_file, session_contents, search_value, add_clicks, clear_clicks, selected_sigs):
+    """Generate chips for both _ref and uploaded _query signatures."""
     if not selected_file or selected_file not in data:
         return [], []
     
     # Get all reference signatures with _ref suffix (matches df_ref column names)
     base_sigs = data[selected_file]
-    all_sigs = [f"{s}_ref" for s in base_sigs]
+    ref_sigs = [f"{s}_ref" for s in base_sigs]
+    query_sigs = []
+    if session_contents is not None:
+        content = session_contents[0] if isinstance(session_contents, list) else session_contents
+        df = pd.DataFrame(content.get("signatures_data", []))
+        if not df.empty:
+            query_sigs = sorted([c for c in df.columns if c.endswith("_query")])
+    all_sigs = ref_sigs + query_sigs
     
-    # Initialize selected_sigs if None
-    if selected_sigs is None:
+    # On source change (file/upload), reset selection to all available signatures
+    if selected_sigs is None or ctx.triggered_id in {"dropdown-4", "session-4-signatures"}:
         selected_sigs = all_sigs.copy()
+    else:
+        # Keep only currently available signatures and preserve previous choices
+        selected_sigs = [sig for sig in selected_sigs if sig in all_sigs]
     
     # Handle "Add All" button
     if add_clicks and ctx.triggered_id == "add-all-btn-4":
@@ -637,26 +648,36 @@ def update_signature_chips_4(selected_file, search_value, add_clicks, clear_clic
     Input({"type": "sig-chip-4", "index": ALL}, "n_clicks"),
     [State("selected-signatures-store-4", "data"),
      State("dropdown-4", "value"),
+     State("session-4-signatures", "data"),
      State("signature-search-4", "value")],
     prevent_initial_call=True
 )
-def toggle_signature_chip_4(n_clicks, selected_sigs, selected_file, search_value):
-    """Handle individual chip clicks to toggle selection. Use n_clicks index to find clicked chip."""
+def toggle_signature_chip_4(n_clicks, selected_sigs, selected_file, session_contents, search_value):
+    """Handle individual chip clicks to toggle selection."""
     if not n_clicks or selected_sigs is None or not selected_file or selected_file not in data:
         return dash.no_update
     
     base_sigs = data[selected_file]
-    all_sigs = [f"{s}_ref" for s in base_sigs]
+    ref_sigs = [f"{s}_ref" for s in base_sigs]
+    query_sigs = []
+    if session_contents is not None:
+        content = session_contents[0] if isinstance(session_contents, list) else session_contents
+        df = pd.DataFrame(content.get("signatures_data", []))
+        if not df.empty:
+            query_sigs = sorted([c for c in df.columns if c.endswith("_query")])
+    all_sigs = ref_sigs + query_sigs
     filtered_sigs = all_sigs
     if search_value:
         search_lower = search_value.lower()
         filtered_sigs = [s for s in all_sigs if search_lower in s.lower()]
     
-    clicked_idx = next((i for i, c in enumerate(n_clicks) if c), None)
-    if clicked_idx is None or clicked_idx >= len(filtered_sigs):
+    triggered = ctx.triggered_id
+    if not isinstance(triggered, dict):
         return dash.no_update
-    
-    sig = filtered_sigs[clicked_idx]
+    sig = triggered.get("index")
+    if sig not in filtered_sigs:
+        return dash.no_update
+
     new_sigs = list(selected_sigs)
     
     if sig in new_sigs:
