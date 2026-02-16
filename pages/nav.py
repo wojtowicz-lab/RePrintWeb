@@ -2,6 +2,9 @@ import dash_mantine_components as dmc
 from dash import dcc, html
 from dash_iconify import DashIconify
 
+# Use dcc.Link so navigation doesn't cause full page reload
+Link = dcc.Link
+
 # Custom styles for the navbar
 NAVBAR_STYLES = {
     "background": "linear-gradient(135deg, #2563EB 0%, #1e40af 100%)",
@@ -32,8 +35,8 @@ navbar = html.Header(
         size="xl",
         style={"display": "flex", "justifyContent": "space-between", "alignItems": "center"},
         children=[
-            # Brand/Logo
-            html.A(
+            # Brand/Logo (dcc.Link = no full page reload)
+            Link(
                 href="/",
                 style={"display": "flex", "alignItems": "center", "textDecoration": "none", "color": "white"},
                 children=[
@@ -45,25 +48,25 @@ navbar = html.Header(
                     html.Span("RePrint", style={"fontSize": "1.5rem", "fontWeight": "700"}),
                 ]
             ),
-            # Center Navigation Links
+            # Center Navigation Links (dcc.Link = no full page reload)
             html.Div(
                 style={"display": "flex", "gap": "2rem", "alignItems": "center"},
                 children=[
-                    html.A(
+                    Link(
                         "Start page",
                         href="/",
                         id="nav-home",
                         style=NAVBAR_LINK_STYLES,
                         className="navbar-link"
                     ),
-                    html.A(
+                    Link(
                         "RePrints charts",
                         href="/page1",
                         id="nav-page1",
                         style=NAVBAR_LINK_STYLES,
                         className="navbar-link"
                     ),
-                    html.A(
+                    Link(
                         "Merge signatures",
                         href="/page3",
                         id="nav-page4",

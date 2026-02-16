@@ -1,7 +1,7 @@
 from utils.figpanel import create_heatmap_with_custom_sim
 from utils.utils import FILES, DEFAULT_SIGNATURES, linkage_methods, DEFAULT_LINKAGE_METHOD, reprint, calculate_rmse, calculate_cosine, calculate_js_divergence
 from main import app
-from dash import dcc, html, Input, Output, State, ctx, ALL
+from dash import dcc, html, Input, Output, State, ctx
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 from pages.nav import navbar
@@ -336,62 +336,20 @@ page1_layout = html.Div([
                     
                     html.Div(style={"marginTop": "2rem"}),
                     
-                    # Signature Search and Selection
+                    # Select Signatures – multi-select dropdown (stable mechanism)
                     dmc.Stack(
                         children=[
-                            dmc.Group(
-                                children=[
-                                    dmc.Text("Select Signatures", size="sm", fw=600),
-                                    dmc.Group(
-                                        children=[
-                                            dmc.Button("Add All", id="add-all-btn-1", size="xs", variant="light", color="blue"),
-                                            dmc.Button("Clear All", id="clear-all-btn-1", size="xs", variant="light", color="gray"),
-                                        ],
-                                        gap="xs",
-                                    ),
-                                ],
-                                justify="space-between",
-                            ),
-                            
-                            # Search bar
-                            dmc.TextInput(
-                                id="signature-search-1",
-                                placeholder="Search signatures...",
-                                leftSection=DashIconify(icon="tabler:search", width=18),
-                                style={"marginBottom": "1rem"},
-                            ),
-                            
-                            # Signature Chips/Badges
-                            html.Div(
-                                id="signatures-chips-container-1",
-                                style={
-                                    "display": "flex",
-                                    "flexWrap": "wrap",
-                                    "gap": "0.75rem",
-                                    "padding": "1rem",
-                                    "backgroundColor": "#F8FAFC",
-                                    "borderRadius": "0.5rem",
-                                    "border": f"1px solid {COLORS['border']}",
-                                    "minHeight": "120px",
-                                    "alignContent": "flex-start",
-                                }
+                            dmc.Text("Select Signatures", size="sm", fw=600),
+                            dcc.Dropdown(
+                                id='signatures-dropdown-1',
+                                options=[{'label': k, 'value': k} for k in data[DEFAULT_SIGNATURES]],
+                                multi=True,
+                                value=[k for k in data[DEFAULT_SIGNATURES]],
+                                placeholder="Choose signatures...",
+                                style={"minWidth": "200px"},
                             ),
                         ],
-                        gap="md",
-                    ),
-                    
-                    # Hidden store for tracking selected signatures
-                    dcc.Store(id="selected-signatures-store-1", data=[k for k in data[DEFAULT_SIGNATURES]]),
-                    
-                    # Hidden dropdown - kept in sync with chips, used by other callbacks
-                    html.Div(
-                        dcc.Dropdown(
-                            id='signatures-dropdown-1',
-                            options=[{'label': k, 'value': k} for k in data.keys()],
-                            multi=True,
-                            value=[k for k in data[DEFAULT_SIGNATURES]],
-                        ),
-                        style={"display": "none"}
+                        gap="xs",
                     ),
                 ]
             ),
@@ -799,113 +757,6 @@ def update_active_file_display(selected_file, session_contents):
         count = len(data[selected_file])
         return selected_file, f"{count} signatures"
     return "None", "0"
-
-
-@app.callback(
-    [Output("signatures-chips-container-1", "children"),
-     Output("selected-signatures-store-1", "data")],
-    [Input("dropdown-1", "value"),
-     Input("session-1-signatures", "data"),
-     Input("signature-search-1", "value"),
-     Input("add-all-btn-1", "n_clicks"),
-     Input("clear-all-btn-1", "n_clicks"),
-     Input("selected-signatures-store-1", "data")],
-    prevent_initial_call=False
-)
-def update_signature_chips(selected_file, session_contents, search_value, add_clicks, clear_clicks, selected_sigs):
-    """Generate signature chips based on file/session and search/filter"""
-    if session_contents is not None:
-        df = pd.DataFrame(session_contents["signatures_data"])
-        all_sigs = [c for c in df.columns if c != "Type"]
-    elif selected_file and selected_file in data:
-        all_sigs = data[selected_file]
-    else:
-        return [], []
-    
-    # Initialize selected_sigs if None
-    if selected_sigs is None:
-        selected_sigs = all_sigs.copy()
-    
-    # Handle "Add All" button
-    if add_clicks and ctx.triggered_id == "add-all-btn-1":
-        selected_sigs = all_sigs.copy()
-    
-    # Handle "Clear All" button
-    if clear_clicks and ctx.triggered_id == "clear-all-btn-1":
-        selected_sigs = []
-    
-    # Filter by search value
-    filtered_sigs = all_sigs
-    if search_value:
-        search_lower = search_value.lower()
-        filtered_sigs = [s for s in all_sigs if search_lower in s.lower()]
-    
-    # Create chips
-    chips = []
-    for sig in filtered_sigs:
-        is_selected = sig in selected_sigs
-        chip = dmc.Button(
-            sig,
-            id={"type": "sig-chip-1", "index": sig},
-            color="blue" if is_selected else "gray",
-            variant="filled" if is_selected else "light",
-            size="xs",
-            style={"cursor": "pointer", "fontSize": "0.9rem", "fontWeight": "500", "padding": "0.25rem 0.75rem"},
-            n_clicks=0,
-        )
-        chips.append(chip)
-    
-    return chips, selected_sigs
-
-
-@app.callback(
-    Output("selected-signatures-store-1", "data", allow_duplicate=True),
-    Input({"type": "sig-chip-1", "index": ALL}, "n_clicks"),
-    [State("selected-signatures-store-1", "data"),
-     State("dropdown-1", "value"),
-     State("session-1-signatures", "data"),
-     State("signature-search-1", "value")],
-    prevent_initial_call=True
-)
-def toggle_signature_chip(n_clicks, selected_sigs, selected_file, session_contents, search_value):
-    """Handle individual chip clicks to toggle selection. Use n_clicks index to find clicked chip."""
-    if session_contents is not None:
-        df = pd.DataFrame(session_contents["signatures_data"])
-        all_sigs = [c for c in df.columns if c != "Type"]
-    elif selected_file and selected_file in data:
-        all_sigs = data[selected_file]
-    else:
-        return dash.no_update
-    if not n_clicks or selected_sigs is None:
-        return dash.no_update
-    filtered_sigs = all_sigs
-    if search_value:
-        search_lower = search_value.lower()
-        filtered_sigs = [s for s in all_sigs if search_lower in s.lower()]
-    
-    clicked_idx = next((i for i, c in enumerate(n_clicks) if c), None)
-    if clicked_idx is None or clicked_idx >= len(filtered_sigs):
-        return dash.no_update
-    
-    sig = filtered_sigs[clicked_idx]
-    new_sigs = list(selected_sigs)
-    
-    if sig in new_sigs:
-        new_sigs.remove(sig)
-    else:
-        new_sigs.append(sig)
-    
-    return new_sigs
-
-
-@app.callback(
-    Output("signatures-dropdown-1", "value", allow_duplicate=True),
-    Input("selected-signatures-store-1", "data"),
-    prevent_initial_call=True
-)
-def sync_dropdown_with_store(selected_sigs):
-    """Keep the hidden dropdown in sync with the chip selection"""
-    return selected_sigs if selected_sigs else []
 
 
 # Callback removed - tooltip-button element doesn't exist in layout
