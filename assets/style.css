@@ -1,0 +1,8 @@
+.custom-option {
+    background-color: #f0f9ff;
+    color: #0056b3;
+}
+
+.custom-option:hover {
+    background-color: #cde0f7;
+}
