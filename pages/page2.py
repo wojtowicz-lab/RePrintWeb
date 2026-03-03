@@ -695,14 +695,26 @@ def download_dataframe(n_clicks, selected_signatures, selected_file, epsilon, co
 
         df_reprint.columns = [f"reprint_{col}" for col in df_reprint.columns]
 
-        return dcc.send_data_frame(df_reprint.to_csv, filename="reprints.csv")
+        # Use the uploaded file name (without extension) as prefix
+        base_name = contents.get('filename', 'uploaded_signatures')
+        if isinstance(base_name, str) and '.' in base_name:
+            base_name = base_name.rsplit('.', 1)[0]
+        filename = f"{base_name}_reprints.csv"
+
+        return dcc.send_data_frame(df_reprint.to_csv, filename=filename)
     else:
         df_signatures = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)[selected_signatures]
         df_reprint = reprint(df_signatures, epsilon=epsilon)
 
         df_reprint.columns = [f"reprint_{col}" for col in df_reprint.columns]
 
-        return dcc.send_data_frame(df_reprint.to_csv, filename="reprints.csv")
+        # Use the reference signatures file name (without extension) as prefix
+        base_name = selected_file or "reprints"
+        if isinstance(base_name, str) and '.' in base_name:
+            base_name = base_name.rsplit('.', 1)[0]
+        filename = f"{base_name}_reprints.csv"
+
+        return dcc.send_data_frame(df_reprint.to_csv, filename=filename)
 
 @app.callback(
     Output("collapse-form-2", "opened"),

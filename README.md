@@ -57,7 +57,7 @@ reprint/
 ├── data/
 │   └── signatures/            # COSMIC .txt files
 ├── pages/
-│   └── page4.py               # Main dashboard for signature comparison
+│   └── page3.py               # Main dashboard for signature comparison
 ├── assets/                    # CSS styles, favicon, etc.
 ├── .env                       # Environment variables
 └── README.md                  # This file

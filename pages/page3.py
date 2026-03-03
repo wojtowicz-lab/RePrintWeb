@@ -42,7 +42,7 @@ COLORS = {
 # ============================================================================
 # APPLICATION LAYOUT
 # ============================================================================
-page4_layout = html.Div([
+page3_layout = html.Div([
     navbar,
     
     # Main Container with light grey background
@@ -517,14 +517,14 @@ page4_layout = html.Div([
                 ),
             ], gutter="md", grow=True, style={"marginBottom": "2.5rem"}),
             
-            dcc.Location(id='url-page4', refresh=False),
+            dcc.Location(id='url-page3', refresh=False),
         ]
     ),
 ])
 
 
 # ============================================================================
-# New Callbacks for Enhanced Signature Selection UI for Page4
+# New Callbacks for Enhanced Signature Selection UI for page3
 # ============================================================================
 
 @app.callback(
@@ -570,7 +570,6 @@ def update_graph(init_load, selected_file, n_clicks, selected_signatures, signat
             # Always load _ref from selected file
             df_ref = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)
             df_ref.columns = [f"{c}_ref" for c in df_ref.columns]
-            print(f"Loaded reference data shape: {df_ref.shape}")
             
             # If uploaded, merge _query columns
             if signatures is not None:
@@ -578,7 +577,6 @@ def update_graph(init_load, selected_file, n_clicks, selected_signatures, signat
                     df_query = pd.DataFrame(signatures[0]['signatures_data'])
                 else:
                     df_query = pd.DataFrame(signatures['signatures_data'])
-                print(f"Loaded query data shape: {df_query.shape}")
                 
                 if 'Type' in df_query.columns:
                     df_query.set_index('Type', inplace=True)
@@ -590,9 +588,6 @@ def update_graph(init_load, selected_file, n_clicks, selected_signatures, signat
                 print("No uploaded signatures, using only reference data")
             
             df_all = df_all[[col for col in selected_signatures if col in df_all.columns]]
-            print(f"Final data shape: {df_all.shape}")
-            print(f"Final data columns: {df_all.columns.tolist()}")
-            print(f"Final data index: {df_all.index.tolist()[:5]}")  # First 5 rows
             
             if df_all.empty:
                 print("Warning: Final dataframe is empty!")

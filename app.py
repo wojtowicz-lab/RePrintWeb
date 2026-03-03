@@ -5,7 +5,7 @@ from flask import request
 from main import *
 from pages.page1 import page1_layout
 from pages.page2 import page2_layout
-from pages.page4 import page4_layout
+from pages.page3 import page3_layout
 
 server = app.server
 
@@ -148,13 +148,13 @@ def display_page(pathname):
     elif pathname == '/page1':
         return page2_layout
     elif pathname == '/page3':
-        return page4_layout
+        return page3_layout
 
 # Callback to set the active state
 @app.callback(
     [Output("nav-home", "active"),
      Output("nav-page1", "active"),
-     Output("nav-page4", "active")
+     Output("nav-page3", "active")
     ],
     [Input("url", "pathname")]
 )

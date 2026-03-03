@@ -21,6 +21,8 @@ NAVBAR_LINK_STYLES = {
     "borderRadius": "0.5rem",
     "cursor": "pointer",
     "display": "inline-block",
+    "textDecoration": "none",
+    "opacity": 0.9,
 }
 
 NAVBAR_LINK_HOVER_STYLES = {
@@ -50,26 +52,47 @@ navbar = html.Header(
             ),
             # Center Navigation Links (dcc.Link = no full page reload)
             html.Div(
-                style={"display": "flex", "gap": "2rem", "alignItems": "center"},
+                style={"display": "flex", "gap": "1rem", "alignItems": "center"},
                 children=[
                     Link(
-                        "Start page",
+                        children=dmc.Group(
+                            gap=6,
+                            align="center",
+                            children=[
+                                DashIconify(icon="tabler:home-2", width=18, height=18),
+                                dmc.Text("Start page", size="sm", fw=600),
+                            ],
+                        ),
                         href="/",
                         id="nav-home",
                         style=NAVBAR_LINK_STYLES,
                         className="navbar-link"
                     ),
                     Link(
-                        "RePrints charts",
+                        children=dmc.Group(
+                            gap=6,
+                            align="center",
+                            children=[
+                                DashIconify(icon="tabler:chart-bar", width=18, height=18),
+                                dmc.Text("RePrints charts", size="sm", fw=600),
+                            ],
+                        ),
                         href="/page1",
                         id="nav-page1",
                         style=NAVBAR_LINK_STYLES,
                         className="navbar-link"
                     ),
                     Link(
-                        "Merge signatures",
+                        children=dmc.Group(
+                            gap=6,
+                            align="center",
+                            children=[
+                                DashIconify(icon="tabler:git-merge", width=18, height=18),
+                                dmc.Text("Merge signatures", size="sm", fw=600),
+                            ],
+                        ),
                         href="/page3",
-                        id="nav-page4",
+                        id="nav-page3",
                         style=NAVBAR_LINK_STYLES,
                         className="navbar-link"
                     ),
