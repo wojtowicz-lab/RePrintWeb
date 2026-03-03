@@ -468,10 +468,12 @@ def update_graph(init_load, selected_file, n_clicks, current_page, selected_sign
             df_signatures = pd.DataFrame(signatures['signatures_data'])
             df_signatures.index = df_signatures['Type']
             df_signatures = df_signatures.drop(columns='Type')
-            df_reprint = reprint(df_signatures, epsilon=epsilon)[selected_signatures]
         else:
             df_signatures = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)[selected_signatures]
-            df_reprint = pd.read_csv(f"data/cosmic_reprints/{selected_file}.reprint", sep='\t', index_col=0)[selected_signatures]
+
+        # Always compute RePrint values using the current epsilon,
+        # so that plots and exported CSV use exactly the same numbers.
+        df_reprint = reprint(df_signatures, epsilon=epsilon)[selected_signatures]
 
         per_page = 5
         total_pages = (len(selected_signatures) + per_page - 1) // per_page

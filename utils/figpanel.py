@@ -206,11 +206,16 @@ def create_reprint_footprint_figure(df_reprint, signature, title=None, show_x_la
     t_hm = t_probs[:, 1]
     fig.add_trace(
         go.Bar(
-            x=x_pos_c, y=c_hm, base=-c_hm / 2,
-            width=width, marker=dict(color=COLORS_C[1], line=dict(color="white", width=0.5)),
-            name="C>G", legendgroup="C", showlegend=True,
-            hovertemplate="Context=%{customdata}<br>Mutation=C>G<br>p=%{y:.4f}<extra></extra>",
-            customdata=C_CONTEXT_LABELS,
+            x=x_pos_c,
+            y=c_hm,              # geometria jak była
+            base=-c_hm / 2,
+            width=width,
+            marker=dict(color=COLORS_C[1], line=dict(color="white", width=0.5)),
+            name="C>G",
+            legendgroup="C",
+            showlegend=True,
+            hovertemplate="Context=%{customdata[0]}<br>Mutation=C>G<br>p=%{customdata[1]:.4f}<extra></extra>",
+            customdata=[[C_CONTEXT_LABELS[i], c_hm[i]] for i in range(len(C_CONTEXT_LABELS))],
         ),
         row=2, col=1
     )
@@ -219,8 +224,8 @@ def create_reprint_footprint_figure(df_reprint, signature, title=None, show_x_la
             x=x_pos_t, y=t_hm, base=-t_hm / 2,
             width=width, marker=dict(color=COLORS_T[1], line=dict(color="white", width=0.5)),
             name="T>C", legendgroup="T", showlegend=True,
-            hovertemplate="Context=%{customdata}<br>Mutation=T>C<br>p=%{y:.4f}<extra></extra>",
-            customdata=T_CONTEXT_LABELS,
+            hovertemplate="Context=%{customdata[0]}<br>Mutation=T>C<br>p=%{customdata[1]:.4f}<extra></extra>",
+            customdata=[[T_CONTEXT_LABELS[i], t_hm[i]] for i in range(len(T_CONTEXT_LABELS))],
         ),
         row=2, col=1
     )
