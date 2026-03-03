@@ -392,7 +392,7 @@ page2_layout = html.Div([
                         children=html.Div([
                             DashIconify(icon="tabler:cloud-upload", width=40, height=40, color=COLORS["primary_blue"], style={"marginBottom": "0.75rem"}),
                             html.P("Drag and drop your signature file here, or click to select", style={"fontSize": "1rem", "fontWeight": "500"}),
-                            html.P("Accepted format: .txt (tab-separated)", style={"fontSize": "0.85rem", "color": COLORS["text_secondary"]})
+                            html.P("Accepted formats: .txt (tab-separated) or .csv (e.g. organ signatures)", style={"fontSize": "0.85rem", "color": COLORS["text_secondary"]})
                         ]),
                         multiple=False,
                         style={
@@ -735,59 +735,92 @@ def download_signatures_only_2(n_clicks, selected_signatures, selected_file, con
 
 
 @app.callback(
-    Output('plots-container-2', 'children', allow_duplicate=True),
+    [
+        Output('plots-container-2', 'children', allow_duplicate=True),
+        Output('plots-navigation', 'children', allow_duplicate=True),
+    ],
     Input('epsilon-2', 'value'),
     prevent_initial_call=True
 )
 def clear_plots_on_parameter_change(epsilon):
-    """Clear plots when epsilon parameter changes to avoid showing outdated data"""
-    return html.Div(
-        style={"textAlign": "center", "paddingTop": "3rem", "paddingBottom": "3rem"},
-        children=[
-            dmc.Alert([
-                html.H5("Parameters Changed", style={"marginBottom": "0.5rem"}),
-                html.P("The epsilon parameter has been modified. Click 'Generate Plots' to refresh the visualizations with the new settings."),
-                html.P("This ensures that the displayed data matches your current parameter configuration.")
-            ], icon=DashIconify(icon="tabler:info-circle", width=18), color="blue", title="Info")
-        ]
+    """Clear plots and pagination when epsilon parameter changes to avoid showing outdated data"""
+    return (
+        html.Div(
+            style={"textAlign": "center", "paddingTop": "3rem", "paddingBottom": "3rem"},
+            children=[
+                dmc.Alert(
+                    [
+                        html.H5("Parameters Changed", style={"marginBottom": "0.5rem"}),
+                        html.P("The epsilon parameter has been modified. Click 'Generate Plots' to refresh the visualizations with the new settings."),
+                        html.P("This ensures that the displayed data matches your current parameter configuration."),
+                    ],
+                    icon=DashIconify(icon="tabler:info-circle", width=18),
+                    color="blue",
+                    title="Info",
+                )
+            ],
+        ),
+        None,
     )
 
 
 @app.callback(
-    Output('plots-container-2', 'children', allow_duplicate=True),
+    [
+        Output('plots-container-2', 'children', allow_duplicate=True),
+        Output('plots-navigation', 'children', allow_duplicate=True),
+    ],
     Input('dropdown-2', 'value'),
     prevent_initial_call=True
 )
 def clear_plots_on_file_change(selected_file):
-    """Clear plots when reference file changes to avoid showing outdated data"""
-    return html.Div(
-        style={"textAlign": "center", "paddingTop": "3rem", "paddingBottom": "3rem"},
-        children=[
-            dmc.Alert([
-                html.H5("Reference File Changed", style={"marginBottom": "0.5rem"}),
-                html.P("The reference signature file has been changed. Click 'Generate Plots' to refresh the visualizations with the new reference data."),
-                html.P("This ensures that the displayed data matches your current reference file selection.")
-            ], icon=DashIconify(icon="tabler:info-circle", width=18), color="cyan", title="Info")
-        ]
+    """Clear plots and pagination when reference file changes to avoid showing outdated data"""
+    return (
+        html.Div(
+            style={"textAlign": "center", "paddingTop": "3rem", "paddingBottom": "3rem"},
+            children=[
+                dmc.Alert(
+                    [
+                        html.H5("Reference File Changed", style={"marginBottom": "0.5rem"}),
+                        html.P("The reference signature file has been changed. Click 'Generate Plots' to refresh the visualizations with the new reference data."),
+                        html.P("This ensures that the displayed data matches your current reference file selection."),
+                    ],
+                    icon=DashIconify(icon="tabler:info-circle", width=18),
+                    color="cyan",
+                    title="Info",
+                )
+            ],
+        ),
+        None,
     )
 
 
 @app.callback(
-    Output('plots-container-2', 'children', allow_duplicate=True),
+    [
+        Output('plots-container-2', 'children', allow_duplicate=True),
+        Output('plots-navigation', 'children', allow_duplicate=True),
+    ],
     Input('session-2-signatures', 'data'),
     prevent_initial_call=True
 )
 def clear_plots_on_upload(uploaded_data):
-    """Clear plots when new signatures are uploaded to avoid showing outdated data"""
+    """Clear plots and pagination when new signatures are uploaded to avoid showing outdated data"""
     if uploaded_data is not None:
-        return html.Div(
-            style={"textAlign": "center", "paddingTop": "3rem", "paddingBottom": "3rem"},
-            children=[
-                dmc.Alert([
-                    html.H5("New Signatures Uploaded", style={"marginBottom": "0.5rem"}),
-                    html.P("New signature data has been uploaded. Click 'Generate Plots' to refresh the visualizations with the new data."),
-                    html.P("This ensures that the displayed data matches your uploaded signature file.")
-                ], icon=DashIconify(icon="tabler:check-circle", width=18), color="green", title="Success")
-            ]
+        return (
+            html.Div(
+                style={"textAlign": "center", "paddingTop": "3rem", "paddingBottom": "3rem"},
+                children=[
+                    dmc.Alert(
+                        [
+                            html.H5("New Signatures Uploaded", style={"marginBottom": "0.5rem"}),
+                            html.P("New signature data has been uploaded. Click 'Generate Plots' to refresh the visualizations with the new data."),
+                            html.P("This ensures that the displayed data matches your uploaded signature file."),
+                        ],
+                        icon=DashIconify(icon="tabler:check-circle", width=18),
+                        color="green",
+                        title="Success",
+                    )
+                ],
+            ),
+            None,
         )
-    return dash.no_update
+    return dash.no_update, dash.no_update

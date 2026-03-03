@@ -123,6 +123,8 @@ def reprint(data, epsilon=10e-4):
 
 import base64
 import io
+
+
 def parse_signatures(contents, filename):
     content_type, content_string = contents.split(',')
 
@@ -131,7 +133,7 @@ def parse_signatures(contents, filename):
         decoded_str = decoded.decode('utf-8')
         buffer = io.StringIO(decoded_str)
 
-        # Wybór parsera na podstawie rozszerzenia
+        # Choose parser based on extension
         if filename.endswith('.txt') or filename.endswith('.tsv'):
             df = pd.read_csv(buffer, sep='\t')
         elif filename.endswith('.csv'):
@@ -139,15 +141,24 @@ def parse_signatures(contents, filename):
         else:
             raise ValueError(f"Unsupported file format for file: {filename}")
 
-        # Sprawdzenie wymaganych kolumn
+        # Ensure we have a 'Type' column.
+        # Some CSV files (e.g. organ signatures like Biliary_Signature.csv)
+        # store mutation types in the first column without a proper header,
+        # which pandas may name '' or 'Unnamed: 0'. In that case, treat it as 'Type'.
         if 'Type' not in df.columns:
-            raise ValueError("Uploaded file must include a 'Type' column.")
+            first_col = df.columns[0]
+            if (isinstance(first_col, str)
+                    and (first_col.strip() == '' or first_col.startswith('Unnamed:'))
+               ):
+                df = df.rename(columns={first_col: 'Type'})
+            else:
+                raise ValueError("Uploaded file must include a 'Type' column.")
 
-        # Dodatkowe sprawdzenie danych
+        # Log basic information for debugging
         print(f"Parsed file: {filename}")
         print(f"Columns: {df.columns.tolist()}")
         print(f"Shape: {df.shape}")
-        print(f"First few rows:")
+        print("First few rows:")
         print(df.head())
 
         return df

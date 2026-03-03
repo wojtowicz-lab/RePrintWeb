@@ -365,7 +365,7 @@ page4_layout = html.Div([
                                             children=html.Div([
                                                 DashIconify(icon="tabler:cloud-upload", width=40, height=40, color="#F39C12", style={"marginBottom": "0.75rem"}),
                                                 html.P("Drag and drop your signature file here, or click to select", style={"fontSize": "1rem", "fontWeight": "500"}),
-                                                html.P("Accepted format: .txt (tab-separated)", style={"fontSize": "0.85rem", "color": COLORS["text_secondary"]})
+                                                html.P("Accepted formats: .txt (tab-separated) or .csv (e.g. organ signatures)", style={"fontSize": "0.85rem", "color": COLORS["text_secondary"]})
                                             ]),
                                             multiple=False,
                                             style={
