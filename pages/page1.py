@@ -144,135 +144,6 @@ page1_layout = html.Div([
                 ]
             ),
             
-            # Actions Toolbar
-            dmc.Card(
-                style={
-                    "backgroundColor": COLORS["white"],
-                    "border": f"1px solid {COLORS['border']}",
-                    "boxShadow": COLORS["shadow"],
-                    "marginBottom": "2.5rem",
-                    "padding": "2rem",
-                    "borderRadius": "0.75rem",
-                },
-                children=[
-                    dmc.Group(
-                        justify="center",
-                        gap="md",
-                        style={"display": "flex", "flexWrap": "wrap"},
-                        children=[
-                            dmc.Button(
-                                "Advanced Options",
-                                id="toggle-button",
-                                color="dark",
-                                size="md",
-                                style={"backgroundColor": COLORS["navy"]},
-                                leftSection=DashIconify(icon="tabler:adjustments", width=18),
-                            ),
-                            dmc.Button(
-                                "Download Reprints",
-                                id="btn_csv-1",
-                                color="teal",
-                                size="md",
-                                style={"backgroundColor": COLORS["teal"]},
-                                leftSection=DashIconify(icon="tabler:download", width=18),
-                            ),
-                            dmc.Button(
-                                "Download Signatures",
-                                id="btn_csv-signatures",
-                                color="gray",
-                                size="md",
-                                leftSection=DashIconify(icon="tabler:download", width=18),
-                            ),
-                            dmc.Button(
-                                "Reload Heatmaps",
-                                id="submit-button",
-                                color="red",
-                                size="md",
-                                style={"backgroundColor": COLORS["red"]},
-                                leftSection=DashIconify(icon="tabler:reload", width=18),
-                            ),
-                        ]
-                    ),
-                ]
-            ),
-            
-            # Advanced Options Collapse
-            dmc.Collapse(
-                opened=False,
-                id="collapse-form",
-                children=[
-                    dmc.Card(
-                        style={
-                            "backgroundColor": COLORS["white"],
-                            "border": f"1px solid {COLORS['border']}",
-                            "boxShadow": COLORS["shadow"],
-                            "marginBottom": "2.5rem",
-                            "padding": "2rem",
-                            "borderRadius": "0.75rem",
-                        },
-                        children=[
-                            dmc.Grid(
-                                children=[
-                                    dmc.GridCol(
-                                        span=6,
-                                        children=[
-                                            dmc.Text("Distance Metric", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
-                                            dcc.Dropdown(
-                                                id='distance-metric',
-                                                options=[
-                                                    {'label': 'Cosine', 'value': 'cosine'},
-                                                    {'label': 'RMSE', 'value': 'rmse'},
-                                                    {'label': 'JS Divergence', 'value': 'js_divergence'}
-                                                ],
-                                                value='rmse',
-                                                style={"width": "100%"}
-                                            ),
-                                        ]
-                                    ),
-                                    dmc.GridCol(
-                                        span=6,
-                                        children=[
-                                            dmc.Text("Clustering Method", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
-                                            dcc.Dropdown(
-                                                id='clustering-method',
-                                                options=[{'label': method.title(), 'value': method} for method in linkage_methods],
-                                                value=DEFAULT_LINKAGE_METHOD,
-                                                clearable=False,
-                                                style={"width": "100%"}
-                                            ),
-                                        ]
-                                    ),
-                                    dmc.GridCol(
-                                        span=12,
-                                        children=[
-                                            dmc.Text("Epsilon (pseudo-count)", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
-                                            dmc.NumberInput(
-                                                id="epsilon",
-                                                value=1e-4,
-                                                min=1e-10,
-                                                max=1e-2,
-                                                step=1e-5,
-                                                placeholder="Enter epsilon value",
-                                                style={"width": "100%"}
-                                            ),
-                                            dmc.Text(
-                                                "Small pseudocount (ε) added to signature probabilities to reduce noise and avoid missing values due to rare mutations. Default: ε = 1e-4",
-                                                size="xs",
-                                                c="dimmed",
-                                                style={"marginTop": "0.5rem"}
-                                            ),
-                                        ]
-                                    ),
-                                ],
-                                grow=True,
-                            ),
-                        ]
-                    ),
-                ]
-            ),
-            
-            html.Div(id='form-output'),
-            
             # File Selection and Signature Management Section
             dmc.Card(
                 style={
@@ -437,6 +308,135 @@ page1_layout = html.Div([
             html.Div(id='upload-error-message-1'),
             html.Div(id='info_uploader'),
             dcc.Store(id='session-1-signatures', storage_type='session', data=None),
+            
+            # Actions Toolbar
+            dmc.Card(
+                style={
+                    "backgroundColor": COLORS["white"],
+                    "border": f"1px solid {COLORS['border']}",
+                    "boxShadow": COLORS["shadow"],
+                    "marginBottom": "2.5rem",
+                    "padding": "2rem",
+                    "borderRadius": "0.75rem",
+                },
+                children=[
+                    dmc.Group(
+                        justify="center",
+                        gap="md",
+                        style={"display": "flex", "flexWrap": "wrap"},
+                        children=[
+                            dmc.Button(
+                                "Advanced Options",
+                                id="toggle-button",
+                                color="dark",
+                                size="md",
+                                style={"backgroundColor": COLORS["navy"]},
+                                leftSection=DashIconify(icon="tabler:adjustments", width=18),
+                            ),
+                            dmc.Button(
+                                "Download Reprints",
+                                id="btn_csv-1",
+                                color="teal",
+                                size="md",
+                                style={"backgroundColor": COLORS["teal"]},
+                                leftSection=DashIconify(icon="tabler:download", width=18),
+                            ),
+                            dmc.Button(
+                                "Download Signatures",
+                                id="btn_csv-signatures",
+                                color="gray",
+                                size="md",
+                                leftSection=DashIconify(icon="tabler:download", width=18),
+                            ),
+                            dmc.Button(
+                                "Reload Heatmaps",
+                                id="submit-button",
+                                color="red",
+                                size="md",
+                                style={"backgroundColor": COLORS["red"]},
+                                leftSection=DashIconify(icon="tabler:reload", width=18),
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            
+            # Advanced Options Collapse
+            dmc.Collapse(
+                opened=False,
+                id="collapse-form",
+                children=[
+                    dmc.Card(
+                        style={
+                            "backgroundColor": COLORS["white"],
+                            "border": f"1px solid {COLORS['border']}",
+                            "boxShadow": COLORS["shadow"],
+                            "marginBottom": "2.5rem",
+                            "padding": "2rem",
+                            "borderRadius": "0.75rem",
+                        },
+                        children=[
+                            dmc.Grid(
+                                children=[
+                                    dmc.GridCol(
+                                        span=6,
+                                        children=[
+                                            dmc.Text("Distance Metric", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
+                                            dcc.Dropdown(
+                                                id='distance-metric',
+                                                options=[
+                                                    {'label': 'Cosine', 'value': 'cosine'},
+                                                    {'label': 'RMSE', 'value': 'rmse'},
+                                                    {'label': 'JS Divergence', 'value': 'js_divergence'}
+                                                ],
+                                                value='rmse',
+                                                style={"width": "100%"}
+                                            ),
+                                        ]
+                                    ),
+                                    dmc.GridCol(
+                                        span=6,
+                                        children=[
+                                            dmc.Text("Clustering Method", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
+                                            dcc.Dropdown(
+                                                id='clustering-method',
+                                                options=[{'label': method.title(), 'value': method} for method in linkage_methods],
+                                                value=DEFAULT_LINKAGE_METHOD,
+                                                clearable=False,
+                                                style={"width": "100%"}
+                                            ),
+                                        ]
+                                    ),
+                                    dmc.GridCol(
+                                        span=12,
+                                        children=[
+                                            dmc.Text("Epsilon (pseudo-count)", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
+                                            dmc.NumberInput(
+                                                id="epsilon",
+                                                value=1e-4,
+                                                min=1e-10,
+                                                max=1e-2,
+                                                step=1e-5,
+                                                placeholder="Enter epsilon value",
+                                                style={"width": "100%"}
+                                            ),
+                                            dmc.Text(
+                                                "Small pseudocount (ε) added to signature probabilities to reduce noise and avoid missing values due to rare mutations. Default: ε = 1e-4",
+                                                size="xs",
+                                                c="dimmed",
+                                                style={"marginTop": "0.5rem"}
+                                            ),
+                                        ]
+                                    ),
+                                ],
+                                grow=True,
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            
+            html.Div(id='form-output'),
             
             # Hide Heatmap Toggle
             dmc.Card(

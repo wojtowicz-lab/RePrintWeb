@@ -144,118 +144,6 @@ page3_layout = html.Div([
                 ]
             ),
             
-            # Actions Toolbar
-            dmc.Card(
-                style={
-                    "backgroundColor": COLORS["white"],
-                    "border": f"1px solid {COLORS['border']}",
-                    "boxShadow": COLORS["shadow"],
-                    "marginBottom": "2.5rem",
-                    "padding": "2rem",
-                    "borderRadius": "0.75rem",
-                },
-                children=[
-                    dmc.Group(
-                        justify="center",
-                        gap="md",
-                        style={"display": "flex", "flexWrap": "wrap"},
-                        children=[
-                            dmc.Button(
-                                "Advanced Options",
-                                id="toggle-button-4",
-                                color="dark",
-                                size="md",
-                                style={"backgroundColor": COLORS["navy"]},
-                                leftSection=DashIconify(icon="tabler:adjustments", width=18),
-                            ),
-                            dmc.Button(
-                                "Generate plots",
-                                id="reload-button",
-                                color="red",
-                                size="md",
-                                style={"backgroundColor": COLORS["red"]},
-                                leftSection=DashIconify(icon="tabler:reload", width=18),
-                            ),
-                        ]
-                    ),
-                ]
-            ),
-            
-            # Advanced Options Collapse
-            dmc.Collapse(
-                opened=False,
-                id="collapse-form-4",
-                children=[
-                    dmc.Card(
-                        style={
-                            "backgroundColor": COLORS["white"],
-                            "border": f"1px solid {COLORS['border']}",
-                            "boxShadow": COLORS["shadow"],
-                            "marginBottom": "2.5rem",
-                            "padding": "2rem",
-                            "borderRadius": "0.75rem",
-                        },
-                        children=[
-                            dmc.Grid(
-                                children=[
-                                    dmc.GridCol(
-                                        span=6,
-                                        children=[
-                                            dmc.Text("Distance Metric", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
-                                            dcc.Dropdown(
-                                                id='distance-metric-4',
-                                                options=[
-                                                    {'label': 'Cosine', 'value': 'cosine'},
-                                                    {'label': 'RMSE', 'value': 'rmse'},
-                                                    {'label': 'JS Divergence', 'value': 'js_divergence'}
-                                                ],
-                                                value='rmse',
-                                                style={"width": "100%"}
-                                            ),
-                                        ]
-                                    ),
-                                    dmc.GridCol(
-                                        span=6,
-                                        children=[
-                                            dmc.Text("Clustering Method", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
-                                            dcc.Dropdown(
-                                                id='clustering-method-4',
-                                                options=[{'label': method.title(), 'value': method} for method in linkage_methods],
-                                                value=DEFAULT_LINKAGE_METHOD,
-                                                clearable=False,
-                                                style={"width": "100%"}
-                                            ),
-                                        ]
-                                    ),
-                                    dmc.GridCol(
-                                        span=12,
-                                        children=[
-                                            dmc.Text("Epsilon (pseudo-count)", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
-                                            dmc.NumberInput(
-                                                id="epsilon-4",
-                                                value=1e-4,
-                                                min=1e-10,
-                                                max=1e-2,
-                                                step=1e-5,
-                                                placeholder="Enter epsilon value",
-                                                style={"width": "100%"}
-                                            ),
-                                            dmc.Text(
-                                                "Small pseudocount (ε) added to signature probabilities to reduce noise and avoid missing values due to rare mutations. Default: ε = 1e-4",
-                                                size="xs",
-                                                c="dimmed",
-                                                style={"marginTop": "0.5rem"}
-                                            ),
-                                        ]
-                                    ),
-                                ],
-                                grow=True,
-                            ),
-                        ]
-                    ),
-                ]
-            ),
-            
             # Reference and Query Signatures Section
             dmc.Grid([
                 dmc.GridCol(
@@ -429,6 +317,118 @@ page3_layout = html.Div([
                                         }
                                     ),
                                 ]
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            
+            # Actions Toolbar
+            dmc.Card(
+                style={
+                    "backgroundColor": COLORS["white"],
+                    "border": f"1px solid {COLORS['border']}",
+                    "boxShadow": COLORS["shadow"],
+                    "marginBottom": "2.5rem",
+                    "padding": "2rem",
+                    "borderRadius": "0.75rem",
+                },
+                children=[
+                    dmc.Group(
+                        justify="center",
+                        gap="md",
+                        style={"display": "flex", "flexWrap": "wrap"},
+                        children=[
+                            dmc.Button(
+                                "Advanced Options",
+                                id="toggle-button-4",
+                                color="dark",
+                                size="md",
+                                style={"backgroundColor": COLORS["navy"]},
+                                leftSection=DashIconify(icon="tabler:adjustments", width=18),
+                            ),
+                            dmc.Button(
+                                "Generate plots",
+                                id="reload-button",
+                                color="red",
+                                size="md",
+                                style={"backgroundColor": COLORS["red"]},
+                                leftSection=DashIconify(icon="tabler:reload", width=18),
+                            ),
+                        ]
+                    ),
+                ]
+            ),
+            
+            # Advanced Options Collapse
+            dmc.Collapse(
+                opened=False,
+                id="collapse-form-4",
+                children=[
+                    dmc.Card(
+                        style={
+                            "backgroundColor": COLORS["white"],
+                            "border": f"1px solid {COLORS['border']}",
+                            "boxShadow": COLORS["shadow"],
+                            "marginBottom": "2.5rem",
+                            "padding": "2rem",
+                            "borderRadius": "0.75rem",
+                        },
+                        children=[
+                            dmc.Grid(
+                                children=[
+                                    dmc.GridCol(
+                                        span=6,
+                                        children=[
+                                            dmc.Text("Distance Metric", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
+                                            dcc.Dropdown(
+                                                id='distance-metric-4',
+                                                options=[
+                                                    {'label': 'Cosine', 'value': 'cosine'},
+                                                    {'label': 'RMSE', 'value': 'rmse'},
+                                                    {'label': 'JS Divergence', 'value': 'js_divergence'}
+                                                ],
+                                                value='rmse',
+                                                style={"width": "100%"}
+                                            ),
+                                        ]
+                                    ),
+                                    dmc.GridCol(
+                                        span=6,
+                                        children=[
+                                            dmc.Text("Clustering Method", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
+                                            dcc.Dropdown(
+                                                id='clustering-method-4',
+                                                options=[{'label': method.title(), 'value': method} for method in linkage_methods],
+                                                value=DEFAULT_LINKAGE_METHOD,
+                                                clearable=False,
+                                                style={"width": "100%"}
+                                            ),
+                                        ]
+                                    ),
+                                    dmc.GridCol(
+                                        span=12,
+                                        children=[
+                                            dmc.Text("Epsilon (pseudo-count)", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
+                                            dmc.NumberInput(
+                                                id="epsilon-4",
+                                                value=1e-4,
+                                                min=1e-10,
+                                                max=1e-2,
+                                                step=1e-5,
+                                                placeholder="Enter epsilon value",
+                                                style={"width": "100%"}
+                                            ),
+                                            dmc.Text(
+                                                "Small pseudocount (ε) added to signature probabilities to reduce noise and avoid missing values due to rare mutations. Default: ε = 1e-4",
+                                                size="xs",
+                                                c="dimmed",
+                                                style={"marginTop": "0.5rem"}
+                                            ),
+                                        ]
+                                    ),
+                                ],
+                                grow=True,
                             ),
                         ]
                     ),
