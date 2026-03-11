@@ -308,6 +308,7 @@ page1_layout = html.Div([
             html.Div(id='upload-error-message-1'),
             html.Div(id='info_uploader'),
             dcc.Store(id='session-1-signatures', storage_type='session', data=None),
+            dcc.Interval(id='initial-load-1', interval=1000, n_intervals=0, max_intervals=1),
             
             # Actions Toolbar
             dmc.Card(
@@ -609,7 +610,8 @@ def toggle_collapse(n, is_open):
     [Output('form-output', 'children'),
      Output('heatmap-plot', 'figure'),
      Output('heatmap-reprint-plot', 'figure')],
-    [Input('submit-button', 'n_clicks'),
+    [Input('initial-load-1', 'n_intervals'),
+     Input('submit-button', 'n_clicks'),
      Input("toggle-heatmap", "checked")],
     [State('dropdown-1', 'value'),
      State('signatures-dropdown-1', 'value'),
@@ -619,44 +621,30 @@ def toggle_collapse(n, is_open):
      State('session-1-signatures', 'data'),
      ]
 )
-def update_output(n_clicks, hide_heatmap, selected_file, selected_signatures, distance_metric, clustering_method, epsilon, signatures):
-    if n_clicks:
-        if signatures is not None:
-            data = pd.DataFrame(signatures['signatures_data'])
-            data.index = data['Type']
-            data = data.drop(columns='Type')[selected_signatures]
-            functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
-            df_reprint = reprint(data, epsilon=epsilon)
-            return (f'Submitted: Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
-                    create_heatmap_with_custom_sim(data, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
-                    create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method)
-                    )
-        else:
-            df_signatures = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)[selected_signatures]
-            functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
-            df_reprint = reprint(df_signatures, epsilon=epsilon)
-            return (f'Submitted: Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
-                    create_heatmap_with_custom_sim(df_signatures, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
-                    create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method)
-                    )
+def update_output(init_load, n_clicks, hide_heatmap, selected_file, selected_signatures, distance_metric, clustering_method, epsilon, signatures):
+    trigger_id = ctx.triggered_id or 'initial-load-1'
+
+    if not selected_signatures or not selected_file:
+        return '', {}, {}
+
+    functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
+
+    if signatures is not None:
+        data_df = pd.DataFrame(signatures['signatures_data'])
+        data_df.index = data_df['Type']
+        data_df = data_df.drop(columns='Type')[selected_signatures]
+        df_reprint = reprint(data_df, epsilon=epsilon)
+        return (f'Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
+                create_heatmap_with_custom_sim(data_df, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
+                create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method)
+                )
     else:
-        if signatures is not None:
-            data = pd.DataFrame(signatures['signatures_data'])
-            data.index = data['Type']
-            data = data.drop(columns='Type')[selected_signatures]
-            functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
-            df_reprint = reprint(data, epsilon=epsilon)
-            return (f'Submitted: Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
-                    create_heatmap_with_custom_sim(data, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
-                    create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method)
-                    )
-        else:
-            df_signatures = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)[selected_signatures]
-            df_reprint = reprint(df_signatures, epsilon=epsilon)
-            return (f'Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
-                    create_heatmap_with_custom_sim(df_signatures, colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
-                    create_heatmap_with_custom_sim(df_reprint, colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method)
-                    )
+        df_signatures = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)[selected_signatures]
+        df_reprint = reprint(df_signatures, epsilon=epsilon)
+        return (f'Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
+                create_heatmap_with_custom_sim(df_signatures, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
+                create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method)
+                )
 
 @app.callback(
     [Output('signatures-dropdown-1', 'options'),
@@ -787,22 +775,14 @@ def update_active_file_display(selected_file, session_contents):
 #     return dash.no_update, dash.no_update
 
 
-@app.callback(
-    [Output('heatmap-plot', 'figure', allow_duplicate=True),
-     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
-    [Input('distance-metric', 'value'),
-     Input('clustering-method', 'value'),
-     Input('epsilon', 'value')],
-    prevent_initial_call=True
-)
-def clear_plots_on_parameter_change(distance_metric, clustering_method, epsilon):
-    """Clear plots when parameters change to avoid showing outdated data"""
+def _empty_heatmap_fig():
+    """Return an empty figure with a reload prompt message"""
     empty_fig = go.Figure()
     empty_fig.update_layout(
         xaxis={'visible': False},
         yaxis={'visible': False},
         annotations=[{
-            'text': 'Click "Reload heatmaps" to generate new plots',
+            'text': 'Click "Reload Heatmaps" to generate new plots',
             'xref': 'paper',
             'yref': 'paper',
             'x': 0.5,
@@ -813,4 +793,52 @@ def clear_plots_on_parameter_change(distance_metric, clustering_method, epsilon)
         plot_bgcolor='rgba(0,0,0,0)',
         paper_bgcolor='rgba(0,0,0,0)'
     )
-    return empty_fig, empty_fig
+    return empty_fig
+
+
+@app.callback(
+    [Output('heatmap-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+    [Input('distance-metric', 'value'),
+     Input('clustering-method', 'value'),
+     Input('epsilon', 'value')],
+    prevent_initial_call=True
+)
+def clear_plots_on_parameter_change(distance_metric, clustering_method, epsilon):
+    """Clear plots when parameters change to avoid showing outdated data"""
+    return _empty_heatmap_fig(), _empty_heatmap_fig()
+
+
+@app.callback(
+    [Output('heatmap-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+    Input('signatures-dropdown-1', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_signature_change(selected_signatures):
+    """Clear plots when signature selection changes"""
+    return _empty_heatmap_fig(), _empty_heatmap_fig()
+
+
+@app.callback(
+    [Output('heatmap-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+    Input('dropdown-1', 'value'),
+    prevent_initial_call=True
+)
+def clear_plots_on_file_change(selected_file):
+    """Clear plots when reference file changes"""
+    return _empty_heatmap_fig(), _empty_heatmap_fig()
+
+
+@app.callback(
+    [Output('heatmap-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+    Input('session-1-signatures', 'data'),
+    prevent_initial_call=True
+)
+def clear_plots_on_upload(uploaded_data):
+    """Clear plots when new signatures are uploaded"""
+    if uploaded_data is not None:
+        return _empty_heatmap_fig(), _empty_heatmap_fig()
+    return dash.no_update, dash.no_update

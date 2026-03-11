@@ -330,7 +330,22 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
     df = df.T
     labels = df.index.tolist()
 
+    # Responsive sizing based on number of signatures
     n = df.shape[0]
+    if n <= 10:
+        px_per_label = 55
+        label_font_size = 11
+    elif n <= 20:
+        px_per_label = 40
+        label_font_size = 9
+    elif n <= 40:
+        px_per_label = 28
+        label_font_size = 7
+    else:
+        px_per_label = 20
+        label_font_size = 6
+
+    responsive_size = max(500, min(1400, px_per_label * n + 150))
     dist_matrix = np.zeros((n, n))
     for i in range(n):
         for j in range(i + 1, n):
@@ -402,9 +417,9 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
                                 'showticklabels': False,
                                 })
 
-    fig.update_layout({'width': 700, 'height': 700,
+    fig.update_layout({'width': responsive_size, 'height': responsive_size,
                        'showlegend': False, 'hovermode': 'closest',
-                       'margin': dict(l=50, r=50, t=60, b=50),  # Reduced top margin
+                       'margin': dict(l=50, r=50, t=60, b=50),
                        })
     fig.update_layout(yaxis={'domain': [0, 1],
                              'mirror': False,
@@ -430,7 +445,7 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
                       plot_bgcolor="rgba(0,0,0,0)")
 
     fig.update_layout(
-        font=dict(size=8)
+        font=dict(size=label_font_size)
     )
 
     return fig
