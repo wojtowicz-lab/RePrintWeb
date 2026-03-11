@@ -454,7 +454,7 @@ page3_layout = html.Div([
                                     type="default",
                                     children=dcc.Graph(
                                         id='heatmap-plot-4',
-                                        style={'height': '600px', 'minHeight': '400px', 'maxWidth': '100%'},
+                                        style={'minHeight': '400px', 'maxWidth': '100%', 'overflow': 'auto'},
                                         config={
                                             'displayModeBar': True,
                                             'displaylogo': False,
@@ -493,7 +493,7 @@ page3_layout = html.Div([
                                     type="default",
                                     children=dcc.Graph(
                                         id='heatmap-reprint-plot-4',
-                                        style={'height': '600px', 'minHeight': '400px', 'maxWidth': '100%'},
+                                        style={'minHeight': '400px', 'maxWidth': '100%', 'overflow': 'auto'},
                                         config={
                                             'displayModeBar': True,
                                             'displaylogo': False,

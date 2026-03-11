@@ -483,34 +483,49 @@ def create_vertical_dendrogram_with_query_labels_right(df, calc_func=calculate_r
             label = ref
         updated_labels.append(label)
 
-    # Calculate responsive dimensions
+    # Calculate responsive dimensions based on data size
     num_labels = len(updated_labels)
-    min_height = max(400, 25 * num_labels)  # Reduced from 30 to 25 per label
-    max_height = min(800, min_height)  # Cap maximum height
-    
-    # Make width responsive and ensure it fits within the card
-    responsive_width = min(1000, max(600, 15 * len(max(updated_labels, key=len))))
-    
+    # Scale height with number of labels: more labels = taller plot
+    if num_labels <= 10:
+        px_per_label = 40
+    elif num_labels <= 30:
+        px_per_label = 30
+    else:
+        px_per_label = 22
+    responsive_height = max(400, px_per_label * num_labels)
+
+    # Scale font size with number of labels
+    if num_labels <= 15:
+        label_font_size = 11
+    elif num_labels <= 30:
+        label_font_size = 9
+    elif num_labels <= 60:
+        label_font_size = 7
+    else:
+        label_font_size = 6
+
+    # Make width responsive to label length
+    max_label_len = len(max(updated_labels, key=len)) if updated_labels else 10
+    right_margin = min(400, max(150, int(label_font_size * 0.6 * max_label_len)))
+
     fig.update_layout(
         yaxis=dict(
             ticktext=updated_labels,
             tickvals=fig['layout']['yaxis']['tickvals'],
-            tickfont=dict(size=9),  # Reduced font size
+            tickfont=dict(size=label_font_size),
             tickangle=0
         ),
-        width=responsive_width,
-        height=max_height,
-        margin=dict(l=50, r=200, t=60, b=40),  # Reduced top margin
+        height=responsive_height,
+        margin=dict(l=50, r=right_margin, t=60, b=40),
         title=dict(
             text=text,
             x=0.5,
             xanchor='center',
-            font=dict(size=12),  # Reduced title font size
-            y=0.95
+            font=dict(size=12),
+            y=0.98
         ),
-        font=dict(size=9),  # Reduced general font size
-        autosize=True,  # Enable autosize
-        # Ensure the plot fits within its container
+        font=dict(size=label_font_size),
+        autosize=True,
         xaxis=dict(
             showgrid=True,
             gridwidth=1,
