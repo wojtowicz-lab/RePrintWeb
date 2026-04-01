@@ -491,11 +491,13 @@ def create_vertical_dendrogram_with_query_labels_right(df, calc_func=calculate_r
     ordered_refs = fig['layout']['yaxis']['ticktext']
     updated_labels = []
     for ref in ordered_refs:
+        ref_display = ref.replace('_ref', '').replace('_query', '')
         if ref in similarity_map:
             queries = similarity_map[ref]
-            label = ", ".join(queries) + " → " + ref
+            queries_display = [q.replace('_ref', '').replace('_query', '') for q in queries]
+            label = ", ".join(queries_display) + " → " + ref_display
         else:
-            label = ref
+            label = ref_display
         updated_labels.append(label)
 
     # Calculate responsive dimensions based on data size

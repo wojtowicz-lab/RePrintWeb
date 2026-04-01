@@ -81,7 +81,7 @@ page3_layout = html.Div([
                                             dmc.GridCol(
                                                 span=4,
                                                 children=[
-                                                    html.H6("1. Reference Base (_ref)", style={"fontWeight": "600", "marginBottom": "1rem"}),
+                                                    html.H6("1. Reference Base", style={"fontWeight": "600", "marginBottom": "1rem"}),
                                                     html.P(
                                                         "The reference base is a collection of predefined mutational signatures that serve as a benchmark for comparison. Examples include COSMIC.",
                                                         style={"fontSize": "0.95rem", "color": COLORS["text_primary"], "marginBottom": "0.75rem"}
@@ -90,17 +90,13 @@ page3_layout = html.Div([
                                                         "Each column represents a known signature (e.g., SBS1, SBS2), each row a mutation type.",
                                                         style={"fontSize": "0.95rem", "color": COLORS["text_primary"], "marginBottom": "0.75rem"}
                                                     ),
-                                                    html.P(
-                                                        "In the analysis, reference columns are marked with a '_ref' suffix.",
-                                                        style={"fontSize": "0.95rem", "color": COLORS["text_primary"]}
-                                                    ),
                                                 ]
                                             ),
                                             # Query Signatures Column
                                             dmc.GridCol(
                                                 span=4,
                                                 children=[
-                                                    html.H6("2. Query Signatures (_query)", style={"fontWeight": "600", "marginBottom": "1rem"}),
+                                                    html.H6("2. Query Signatures", style={"fontWeight": "600", "marginBottom": "1rem"}),
                                                     html.P(
                                                         "Query signatures are your own mutational signatures that you upload to compare against the reference base.",
                                                         style={"fontSize": "0.95rem", "color": COLORS["text_primary"], "marginBottom": "0.75rem"}
@@ -204,7 +200,7 @@ page3_layout = html.Div([
                                         dmc.Text("Select Signatures", size="sm", fw=600),
                                         dcc.Dropdown(
                                             id='signatures-dropdown-4',
-                                            options=[{'label': f"{s}_ref", 'value': f"{s}_ref"} for s in data[DEFAULT_SIGNATURES]],
+                                            options=[{'label': s, 'value': f"{s}_ref"} for s in data[DEFAULT_SIGNATURES]],
                                             multi=True,
                                             value=[f"{s}_ref" for s in data[DEFAULT_SIGNATURES]],
                                             placeholder="Choose signatures...",
@@ -692,7 +688,7 @@ def set_options(selected_category, contents):
         print(f"Combined columns: {combined[:10]}...")  # First 10
         
         return (
-            [{'label': sig, 'value': sig} for sig in combined],
+            [{'label': sig.replace('_ref', '').replace('_query', ''), 'value': sig} for sig in combined],
             combined,
             {'display': 'block'},
             info
@@ -705,7 +701,7 @@ def set_options(selected_category, contents):
         base_signatures = data.get(selected_category, [])
         ref_cols = [f"{s}_ref" for s in base_signatures]
         return (
-            [{'label': sig, 'value': sig} for sig in ref_cols],
+            [{'label': sig.replace('_ref', ''), 'value': sig} for sig in ref_cols],
             ref_cols,
             {'display': 'block'},
             f'Error: {str(e)}'
