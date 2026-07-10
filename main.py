@@ -6,7 +6,7 @@ app = Dash(
     __name__, 
     suppress_callback_exceptions=True, 
     external_stylesheets=[dbc.themes.BOOTSTRAP],
-    serve_locally=False,
+    serve_locally=True,
     include_assets_files=False,
     assets_folder=os.path.join(os.path.dirname(__file__), 'assets'),
     assets_url_path='/assets'

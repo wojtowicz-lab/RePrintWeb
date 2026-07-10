@@ -16,7 +16,9 @@ FILES = [
     'COSMIC_v3.1_SBS_GRCh37.txt',
     'COSMIC_v3_SBS_GRCh37.txt',
     'COSMIC_v2_SBS_GRCh37.txt',
-    'COSMIC_v1_SBS_GRCh37.txt'
+    'COSMIC_v1_SBS_GRCh37.txt',
+    'transcribed.txt',
+    'untranscribed.txt'
 ]
 
 DEFAULT_SIGNATURES = 'COSMIC_v3.4_SBS_GRCh38.txt'
