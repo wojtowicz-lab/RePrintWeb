@@ -1,0 +1,31 @@
+name: Deploy to mimsrvwsgi
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy (through duch.mimuw.edu.pl jump host)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USERNAME }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          proxy_host: ${{ secrets.PROXY_HOST }}
+          proxy_username: ${{ secrets.PROXY_USERNAME }}
+          proxy_key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            cd ~/RePrintWeb
+            git fetch origin main
+            git reset --hard origin/main
+            source .venv/bin/activate
+            pip install -r requirements.txt --quiet
+            systemctl --user restart gunicorn
+            sleep 2
+            systemctl --user is-active gunicorn
