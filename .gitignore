@@ -52,6 +52,7 @@ Desktop.ini
 .venv
 env/
 venv/
+venv311/
 ENV/
 env.bak/
 venv.bak/
@@ -62,3 +63,6 @@ html/
 latex/
 doxygen_sqlite3.db
 logs
+
+# Playwright MCP session artifacts
+.playwright-mcp/
