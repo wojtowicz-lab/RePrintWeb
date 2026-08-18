@@ -83,7 +83,7 @@ page1_layout = html.Div([
                                                     html.Ol(
                                                         [
                                                             html.Li("Select a reference signature file from the first dropdown (e.g., COSMIC).", style={"marginBottom": "0.75rem"}),
-                                                            html.Li("Optionally upload your own query signatures using the drag-and-drop box.", style={"marginBottom": "0.75rem"}),
+                                                            html.Li("Optionally upload your own query signatures using the drag-and-drop box — upload multiple files at once to merge them (aligned by mutation Type) before clustering.", style={"marginBottom": "0.75rem"}),
                                                             html.Li("Adjust advanced options (distance metric, clustering, epsilon), if needed.", style={"marginBottom": "0.75rem"}),
                                                             html.Li([
                                                                 html.Strong("Click "), "the ",
@@ -243,7 +243,11 @@ page1_layout = html.Div([
                                 children=[
                                     html.H5("Expected File Format", style={"fontWeight": "600", "marginTop": 0, "marginBottom": "0.75rem"}),
                                     html.P(
-                                        "The uploaded file should be a tab-separated file (.txt) containing mutation types and corresponding mutation signatures.",
+                                        "The uploaded file should be a tab-separated file (.txt/.tsv) or CSV containing mutation types and corresponding mutation signatures.",
+                                        style={"fontSize": "0.95rem", "marginBottom": "0.75rem"}
+                                    ),
+                                    html.P(
+                                        "You can upload several files at once (e.g. COSMIC, Kucab2019, Zou2018). They will be merged into a single dataset aligned by the Type column; if two files share a signature name, the column is prefixed with its source filename to avoid ambiguity.",
                                         style={"fontSize": "0.95rem", "marginBottom": "0.75rem"}
                                     ),
                                     html.P("Columns:", style={"fontSize": "0.95rem", "marginBottom": "0.5rem", "fontWeight": "600"}),
@@ -293,22 +297,57 @@ page1_layout = html.Div([
                         id='upload-data-1-signatures',
                         children=html.Div([
                             DashIconify(icon="tabler:cloud-upload", width=40, height=40, color=COLORS["primary_blue"], style={"marginBottom": "0.75rem"}),
-                            html.P("Drag and drop your signature file here, or click to select", style={"fontSize": "1rem", "fontWeight": "500"}),
-                            html.P("Accepted formats: .txt (tab-separated) or .csv (e.g. organ signatures)", style={"fontSize": "0.85rem", "color": COLORS["text_secondary"]})
+                            html.P("Drag and drop your signature file(s) here, or click to select", style={"fontSize": "1rem", "fontWeight": "500"}),
+                            html.P("Accepted formats: .txt/.tsv (tab-separated) or .csv (e.g. organ signatures). Select multiple files to merge them.", style={"fontSize": "0.85rem", "color": COLORS["text_secondary"]})
                         ]),
-                        multiple=False,
+                        multiple=True,
                         style={
                             "width": "100%",
                             "cursor": "pointer",
                         }
                     ),
+                    html.Div(style={"marginTop": "1.25rem"}),
+                    dmc.Divider(label="or", labelPosition="center"),
+                    html.Div(style={"marginTop": "1.25rem"}),
+                    dmc.Button(
+                        "Load Example (COSMIC + Kucab2019 + Zou2018)",
+                        id="load-example-btn",
+                        variant="outline",
+                        color="blue",
+                        size="md",
+                        leftSection=DashIconify(icon="tabler:flask", width=18),
+                    ),
+                    dmc.Text(
+                        "Loads and merges 3 bundled signature datasets so you can try clustering right away.",
+                        size="xs",
+                        c="dimmed",
+                        style={"marginTop": "0.5rem"}
+                    ),
+                    dmc.Button(
+                        "Clear Uploaded Signatures",
+                        id="clear-upload-btn",
+                        variant="subtle",
+                        color="gray",
+                        size="sm",
+                        leftSection=DashIconify(icon="tabler:x", width=16),
+                        style={"marginTop": "1rem", "display": "none"},
+                    ),
+                    dmc.Text(
+                        "Switches back to the bundled reference file dropdown (e.g. COSMIC).",
+                        size="xs",
+                        c="dimmed",
+                        id="clear-upload-hint",
+                        style={"marginTop": "0.25rem", "display": "none"},
+                    ),
                 ]
             ),
-            
+
             html.Div(id='upload-error-message-1'),
             html.Div(id='info_uploader'),
             dcc.Store(id='session-1-signatures', storage_type='session', data=None),
             dcc.Interval(id='initial-load-1', interval=1000, n_intervals=0, max_intervals=1),
+            dcc.Store(id='auto-reload-armed', data=False),
+            dcc.Store(id='reload-signal', data=0),
             
             # Actions Toolbar
             dmc.Card(
@@ -423,6 +462,30 @@ page1_layout = html.Div([
                                             ),
                                             dmc.Text(
                                                 "Small pseudocount (ε) added to signature probabilities to reduce noise and avoid missing values due to rare mutations. Default: ε = 1e-4",
+                                                size="xs",
+                                                c="dimmed",
+                                                style={"marginTop": "0.5rem"}
+                                            ),
+                                        ]
+                                    ),
+                                    dmc.GridCol(
+                                        span=12,
+                                        children=[
+                                            dmc.Text("Cluster Granularity (dendrogram cut threshold)", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
+                                            dmc.Slider(
+                                                id="cluster-threshold",
+                                                value=0.7,
+                                                min=0.1,
+                                                max=0.9,
+                                                step=0.05,
+                                                marks=[
+                                                    {"value": 0.1, "label": "More clusters"},
+                                                    {"value": 0.9, "label": "Fewer clusters"},
+                                                ],
+                                                style={"width": "100%", "marginBottom": "1.5rem"}
+                                            ),
+                                            dmc.Text(
+                                                "Cuts the dendrogram at this fraction of its tallest branch to group signatures into clusters on the heatmap. Lower it to split large clusters into smaller ones. Default: 0.7",
                                                 size="xs",
                                                 c="dimmed",
                                                 style={"marginTop": "0.5rem"}
@@ -550,8 +613,28 @@ page1_layout = html.Div([
     ),
 ])
 
-from utils.utils import parse_signatures
+from utils.utils import parse_signatures, merge_uploaded_signatures, load_example_merged_signatures, EXAMPLE_SIGNATURE_FILES
 import dash
+
+
+def _as_lists(contents, filename):
+    """dcc.Upload with multiple=True normally returns lists, but guard against
+    a single value just in case."""
+    if not isinstance(contents, list):
+        return [contents], [filename]
+    return contents, filename
+
+
+def _merged_base_name(filenames):
+    """Build a filesystem-friendly prefix from one or more uploaded filenames."""
+    if not filenames:
+        return "uploaded_signatures"
+    if isinstance(filenames, str):
+        filenames = [filenames]
+    stems = [f.rsplit('.', 1)[0] if '.' in f else f for f in filenames]
+    joined = "_".join(stems)
+    return joined if len(joined) <= 60 else f"merged_{len(stems)}_files"
+
 
 @app.callback(
     [Output('session-1-signatures', 'data')],
@@ -560,10 +643,17 @@ import dash
 )
 def update_output_signatures(contents, filename):
     if contents is not None:
-        df_signatures = parse_signatures(contents, filename)
+        contents_list, filenames_list = _as_lists(contents, filename)
+        df_signatures, errors = merge_uploaded_signatures(contents_list, filenames_list)
 
-        signatures_info = "Some information extracted from df_signatures"
-        return [{'signatures_data': df_signatures.to_dict('records'), 'filename': filename, 'info': signatures_info}]
+        if df_signatures is None:
+            return dash.no_update
+
+        failed_names = {f for f, _ in errors}
+        succeeded_names = [f for f in filenames_list if f not in failed_names]
+
+        signatures_info = f"Merged {len(succeeded_names)} file(s): {', '.join(succeeded_names)}"
+        return [{'signatures_data': df_signatures.to_dict('records'), 'filename': succeeded_names, 'info': signatures_info}]
     else:
         return dash.no_update
 
@@ -574,25 +664,85 @@ def update_output_signatures(contents, filename):
     prevent_initial_call=True
 )
 def show_upload_status(contents, filename):
-    if contents is not None:
-        try:
-            _ = parse_signatures(contents, filename)
-            return dmc.Alert(
-                f"Successfully loaded file: {filename}",
-                icon=DashIconify(icon="tabler:check-circle", width=18),
-                title="Success",
-                color="green",
-                withCloseButton=True
-            )
-        except Exception as e:
-            return dmc.Alert(
-                f"Error while processing file '{filename}'",
-                icon=DashIconify(icon="tabler:alert-circle", width=18),
-                title="Error",
-                color="red",
-                withCloseButton=True
-            )
-    return ""
+    if contents is None:
+        return ""
+
+    contents_list, filenames_list = _as_lists(contents, filename)
+    _, errors = merge_uploaded_signatures(contents_list, filenames_list)
+    failed_names = {f for f, _ in errors}
+    succeeded_names = [f for f in filenames_list if f not in failed_names]
+
+    alerts = []
+    if succeeded_names:
+        alerts.append(dmc.Alert(
+            f"Successfully loaded and merged {len(succeeded_names)} file(s): {', '.join(succeeded_names)}",
+            icon=DashIconify(icon="tabler:check-circle", width=18),
+            title="Success",
+            color="green",
+            withCloseButton=True
+        ))
+    for fname, message in errors:
+        alerts.append(dmc.Alert(
+            f"Error while processing file '{fname}': {message}",
+            icon=DashIconify(icon="tabler:alert-circle", width=18),
+            title="Error",
+            color="red",
+            withCloseButton=True
+        ))
+    return alerts
+
+
+@app.callback(
+    [Output('session-1-signatures', 'data', allow_duplicate=True),
+     Output('upload-error-message-1', 'children', allow_duplicate=True),
+     Output('toggle-heatmap', 'checked', allow_duplicate=True),
+     Output('auto-reload-armed', 'data', allow_duplicate=True)],
+    Input('load-example-btn', 'n_clicks'),
+    prevent_initial_call=True,
+)
+def load_example_dataset(n_clicks):
+    if not n_clicks:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
+    df_signatures = load_example_merged_signatures()
+    info = f"Loaded example dataset: {', '.join(EXAMPLE_SIGNATURE_FILES)}"
+    alert = dmc.Alert(
+        f"Loaded example dataset ({len(EXAMPLE_SIGNATURE_FILES)} files merged): {', '.join(EXAMPLE_SIGNATURE_FILES)}",
+        icon=DashIconify(icon="tabler:check-circle", width=18),
+        title="Example Loaded",
+        color="blue",
+        withCloseButton=True
+    )
+    return {'signatures_data': df_signatures.to_dict('records'), 'filename': EXAMPLE_SIGNATURE_FILES, 'info': info}, alert, False, True
+
+@app.callback(
+    [Output('session-1-signatures', 'data', allow_duplicate=True),
+     Output('upload-data-1-signatures', 'contents'),
+     Output('upload-error-message-1', 'children', allow_duplicate=True),
+     Output('auto-reload-armed', 'data', allow_duplicate=True)],
+    Input('clear-upload-btn', 'n_clicks'),
+    prevent_initial_call=True,
+)
+def clear_uploaded_signatures(n_clicks):
+    if not n_clicks:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
+    return None, None, '', True
+
+
+@app.callback(
+    Output('reload-signal', 'data'),
+    Output('auto-reload-armed', 'data', allow_duplicate=True),
+    Input('signatures-dropdown-1', 'value'),
+    State('auto-reload-armed', 'data'),
+    State('reload-signal', 'data'),
+    prevent_initial_call=True,
+)
+def fire_auto_reload(_, armed, signal):
+    if not armed:
+        return dash.no_update, dash.no_update
+    return (signal or 0) + 1, False
+
 
 @app.callback(
     Output("collapse-form", "opened"),
@@ -611,6 +761,7 @@ def toggle_collapse(n, is_open):
      Output('heatmap-plot', 'figure'),
      Output('heatmap-reprint-plot', 'figure')],
     [Input('initial-load-1', 'n_intervals'),
+     Input('reload-signal', 'data'),
      Input('submit-button', 'n_clicks'),
      Input("toggle-heatmap", "checked")],
     [State('dropdown-1', 'value'),
@@ -618,16 +769,23 @@ def toggle_collapse(n, is_open):
      State('distance-metric', 'value'),
      State('clustering-method', 'value'),
      State('epsilon', 'value'),
+     State('cluster-threshold', 'value'),
      State('session-1-signatures', 'data'),
-     ]
+     ],
+    running=[
+        (Output('submit-button', 'loading'), True, False),
+        (Output('submit-button', 'disabled'), True, False),
+    ],
 )
-def update_output(init_load, n_clicks, hide_heatmap, selected_file, selected_signatures, distance_metric, clustering_method, epsilon, signatures):
+def update_output(init_load, reload_signal, n_clicks, hide_heatmap, selected_file, selected_signatures, distance_metric, clustering_method, epsilon, cluster_threshold, signatures):
     trigger_id = ctx.triggered_id or 'initial-load-1'
 
     if not selected_signatures or not selected_file:
         return '', {}, {}
 
     functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
+    metric_labels = {'rmse': 'RMSE', 'cosine': 'Cosine', 'js_divergence': 'JS Divergence'}
+    metric_label = metric_labels[distance_metric]
 
     if signatures is not None:
         data_df = pd.DataFrame(signatures['signatures_data'])
@@ -635,22 +793,24 @@ def update_output(init_load, n_clicks, hide_heatmap, selected_file, selected_sig
         data_df = data_df.drop(columns='Type')[selected_signatures]
         df_reprint = reprint(data_df, epsilon=epsilon)
         return (f'Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
-                create_heatmap_with_custom_sim(data_df, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
-                create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method)
+                create_heatmap_with_custom_sim(data_df, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label),
+                create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label)
                 )
     else:
         df_signatures = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)[selected_signatures]
         df_reprint = reprint(df_signatures, epsilon=epsilon)
         return (f'Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
-                create_heatmap_with_custom_sim(df_signatures, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method),
-                create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method)
+                create_heatmap_with_custom_sim(df_signatures, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label),
+                create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label)
                 )
 
 @app.callback(
     [Output('signatures-dropdown-1', 'options'),
      Output('signatures-dropdown-1', 'value'),
      Output('dropdown-1', 'style'),
-     Output('info_uploader', 'children')
+     Output('info_uploader', 'children'),
+     Output('clear-upload-btn', 'style'),
+     Output('clear-upload-hint', 'style'),
      ],
     [Input('dropdown-1', 'value'),
      Input('session-1-signatures', 'data')]
@@ -665,12 +825,16 @@ def set_options(selected_category, contents):
             [{'label': signature, 'value': signature} for signature in signatures],
             signatures,
             {'display': 'None'},
-            f'Added your signatures {contents["filename"]}')
+            '',
+            {"marginTop": "1rem", "display": "inline-block"},
+            {"marginTop": "0.25rem", "display": "block"})
 
     return ([{'label': f"{i}", 'value': i} for i in data[selected_category]],
             [i for i in data[selected_category]],
             {'display': 'block'},
-            'Not Uploaded')
+            'Not Uploaded',
+            {"marginTop": "1rem", "display": "none"},
+            {"marginTop": "0.25rem", "display": "none"})
 
 
 @app.callback(
@@ -691,10 +855,8 @@ def download_dataframe(n_clicks, selected_signatures, selected_file, epsilon, co
 
         df_reprint.columns = [f"reprint_{col}" for col in df_reprint.columns]
 
-        # Use the uploaded file name (without extension) as prefix
-        base_name = contents.get('filename', 'uploaded_signatures')
-        if isinstance(base_name, str) and '.' in base_name:
-            base_name = base_name.rsplit('.', 1)[0]
+        # Use the uploaded file name(s) (without extension) as prefix
+        base_name = _merged_base_name(contents.get('filename'))
         filename = f"{base_name}_reprints.csv"
 
         return dcc.send_data_frame(df_reprint.to_csv, filename=filename)
@@ -752,7 +914,9 @@ def update_active_file_display(selected_file, session_contents):
     if session_contents is not None:
         df = pd.DataFrame(session_contents["signatures_data"])
         sig_cols = [c for c in df.columns if c != "Type"]
-        return session_contents["filename"], f"{len(sig_cols)} signatures"
+        uploaded_names = session_contents["filename"]
+        uploaded_names = uploaded_names if isinstance(uploaded_names, list) else [uploaded_names]
+        return ", ".join(uploaded_names), f"{len(sig_cols)} signatures"
     if selected_file and selected_file in data:
         count = len(data[selected_file])
         return selected_file, f"{count} signatures"
@@ -801,10 +965,11 @@ def _empty_heatmap_fig():
      Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
     [Input('distance-metric', 'value'),
      Input('clustering-method', 'value'),
-     Input('epsilon', 'value')],
+     Input('epsilon', 'value'),
+     Input('cluster-threshold', 'value')],
     prevent_initial_call=True
 )
-def clear_plots_on_parameter_change(distance_metric, clustering_method, epsilon):
+def clear_plots_on_parameter_change(distance_metric, clustering_method, epsilon, cluster_threshold):
     """Clear plots when parameters change to avoid showing outdated data"""
     return _empty_heatmap_fig(), _empty_heatmap_fig()
 

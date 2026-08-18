@@ -3,7 +3,7 @@ from scipy.spatial.distance import squareform
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from utils.utils import calculate_rmse
-from scipy.cluster.hierarchy import linkage
+from scipy.cluster.hierarchy import linkage, fcluster
 import numpy as np
 
 
@@ -325,7 +325,7 @@ def create_reprint_footprint_figure(df_reprint, signature, title=None, show_x_la
     return fig
 
 
-def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blues', hide_heatmap=False, method='complete'):
+def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blues', hide_heatmap=False, method='complete', cluster_threshold_frac=0.7, metric_label='Similarity'):
     # Transpose data and get labels
     df = df.T
     labels = df.index.tolist()
@@ -356,66 +356,146 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
     condensed_rmse = squareform(dist_matrix)
     Z = linkage(condensed_rmse, method=method)
 
+    if hide_heatmap:
+        # No heatmap: show a standalone vertical dendrogram (leaves along the
+        # bottom, tree growing upward).
+        fig = ff.create_dendrogram(df.values, labels=labels, orientation='bottom', linkagefun=lambda _: Z)
+
+        fig.update_layout({'width': responsive_size, 'height': responsive_size,
+                           'showlegend': False, 'hovermode': 'closest',
+                           'margin': dict(l=50, r=50, t=60, b=50),
+                           })
+        fig.update_layout(xaxis={'domain': [0, 1],
+                                 'mirror': False,
+                                 'showgrid': False,
+                                 'showline': False,
+                                 'zeroline': False,
+                                 'showticklabels': True,
+                                 })
+        fig.update_layout(yaxis={'domain': [0, 1],
+                                 'mirror': False,
+                                 'showgrid': False,
+                                 'showline': False,
+                                 'zeroline': False,
+                                 'showticklabels': True,
+                                 })
+
+        fig.update_layout(paper_bgcolor="rgba(0,0,0,0)",
+                          plot_bgcolor="rgba(0,0,0,0)")
+
+        fig.update_layout(
+            font=dict(size=label_font_size)
+        )
+
+        return fig
+
     # Create bottom dendrogram
     fig = ff.create_dendrogram(df.values, labels=labels, orientation='bottom', linkagefun=lambda _: Z)
     fig.for_each_trace(lambda trace: trace.update(visible=False))
 
     # Create side dendrogram
     dendro_side = ff.create_dendrogram(df.values, orientation='right', linkagefun=lambda _: Z)
-    if not hide_heatmap:
-        for i in range(len(dendro_side['data'])):
-            dendro_side['data'][i]['xaxis'] = 'x2'
-    
+    for i in range(len(dendro_side['data'])):
+        dendro_side['data'][i]['xaxis'] = 'x2'
+
     # Add side dendrogram data to the figure
     for data in dendro_side['data']:
         fig.add_trace(data)
     dendro_leaves = dendro_side['layout']['yaxis']['ticktext']
     dendro_leaves = list(map(int, dendro_leaves))
-    
-    if not hide_heatmap:
-        # Create heatmap
-        heat_data = dist_matrix[dendro_leaves, :]
-        heat_data = heat_data[:, dendro_leaves]
 
-        heatmap = [
-            go.Heatmap(
-                x=dendro_leaves,
-                y=dendro_leaves,
-                z=heat_data,
-                reversescale=True,
-                colorscale=colorscale,
-                colorbar=dict(
-                    x=1.2,
-                    xpad=10
-                ),
-                hovertemplate='x: %{x}<br>y: %{y}<br>similarity: %{z:.3f}<extra></extra>'
-            )
-        ]
+    # Create heatmap
+    heat_data = dist_matrix[dendro_leaves, :]
+    heat_data = heat_data[:, dendro_leaves]
 
-        heatmap[0]['x'] = fig['layout']['xaxis']['tickvals']
-        heatmap[0]['y'] = dendro_side['layout']['yaxis']['tickvals']
+    # Group signatures into clusters by cutting the dendrogram at a fraction
+    # of its tallest merge distance. Lower cluster_threshold_frac cuts earlier
+    # (smaller distance) and yields more, smaller clusters.
+    cluster_threshold = cluster_threshold_frac * Z[:, 2].max()
+    cluster_ids = fcluster(Z, t=cluster_threshold, criterion='distance')
+    ordered_cluster_ids = [cluster_ids[leaf] for leaf in dendro_leaves]
 
-        # Add heatmap data to the figure
-        for data in heatmap:
-            fig.add_trace(data)
+    # Per-cell cluster membership list, attached as customdata so hovering
+    # any cell of a cluster's block reliably shows all its signatures -
+    # this rides on the heatmap's own per-cell hover instead of a separate
+    # overlay trace, so it works no matter how large the cluster's block is.
+    ordered_labels = [labels[leaf] for leaf in dendro_leaves]
+    cluster_members = {}
+    for cid in set(ordered_cluster_ids):
+        members = [lbl for lbl, c in zip(ordered_labels, ordered_cluster_ids) if c == cid]
+        cluster_members[cid] = f"<br><br>Cluster ({len(members)} signatures):<br>" + "<br>".join(members) if len(members) > 1 else ""
 
-        fig.update_layout(xaxis={'domain': [.15, 1],
-                                'mirror': False,
-                                'showgrid': False,
-                                'showline': False,
-                                'zeroline': False,
-                                'side': 'top',  # Ustawienie etykiet osi X na górze
-                                'tickvals': fig['layout']['xaxis']['tickvals'],
-                                'ticktext': [labels[i] for i in dendro_leaves]
-                                })
+    customdata = [
+        [cluster_members[row_c] if row_c == col_c else "" for col_c in ordered_cluster_ids]
+        for row_c in ordered_cluster_ids
+    ]
 
-        fig.update_layout(xaxis2={'domain': [0, .15],
-                                'mirror': False,
-                                'showgrid': False,
-                                'showline': False,
-                                'zeroline': False,
-                                'showticklabels': False,
-                                })
+    heatmap = [
+        go.Heatmap(
+            x=dendro_leaves,
+            y=dendro_leaves,
+            z=heat_data,
+            reversescale=True,
+            colorscale=colorscale,
+            colorbar=dict(
+                x=1.2,
+                xpad=10
+            ),
+            customdata=customdata,
+            hovertemplate=f'x: %{{x}}<br>y: %{{y}}<br>{metric_label}: %{{z:.3f}}%{{customdata}}<extra></extra>'
+        )
+    ]
+
+    heatmap[0]['x'] = fig['layout']['xaxis']['tickvals']
+    heatmap[0]['y'] = dendro_side['layout']['yaxis']['tickvals']
+
+    # Add heatmap data to the figure
+    for data in heatmap:
+        fig.add_trace(data)
+
+    # Draw a border around each multi-signature cluster's block so the
+    # grouping is visible at a glance (purely decorative; hover is handled
+    # via customdata above).
+    x_tickvals = list(heatmap[0]['x'])
+    y_tickvals = list(heatmap[0]['y'])
+    half_dx = (x_tickvals[1] - x_tickvals[0]) / 2 if n > 1 else 5
+    half_dy = (y_tickvals[1] - y_tickvals[0]) / 2 if n > 1 else 5
+
+    start = 0
+    for i in range(1, n + 1):
+        if i == n or ordered_cluster_ids[i] != ordered_cluster_ids[start]:
+            end = i - 1
+            if end > start:
+                x0, x1 = x_tickvals[start] - half_dx, x_tickvals[end] + half_dx
+                y0, y1 = y_tickvals[start] - half_dy, y_tickvals[end] + half_dy
+
+                fig.add_shape(
+                    type="rect",
+                    x0=x0, x1=x1, y0=y0, y1=y1,
+                    xref="x", yref="y",
+                    line=dict(color="rgba(0,0,0,0.75)", width=2),
+                    fillcolor="rgba(0,0,0,0)",
+                    layer="above",
+                )
+            start = i
+
+    fig.update_layout(xaxis={'domain': [.15, 1],
+                            'mirror': False,
+                            'showgrid': False,
+                            'showline': False,
+                            'zeroline': False,
+                            'side': 'top',  # Ustawienie etykiet osi X na górze
+                            'tickvals': fig['layout']['xaxis']['tickvals'],
+                            'ticktext': [labels[i] for i in dendro_leaves]
+                            })
+
+    fig.update_layout(xaxis2={'domain': [0, .15],
+                            'mirror': False,
+                            'showgrid': False,
+                            'showline': False,
+                            'zeroline': False,
+                            'showticklabels': False,
+                            })
 
     fig.update_layout({'width': responsive_size, 'height': responsive_size,
                        'showlegend': False, 'hovermode': 'closest',
@@ -437,7 +517,7 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
                               'showgrid': False,
                               'showline': False,
                               'zeroline': False,
-                              'showticklabels': True,  
+                              'showticklabels': True,
                               'ticks': "",
                               })
 

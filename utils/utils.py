@@ -168,3 +168,80 @@ def parse_signatures(contents, filename):
     except Exception as e:
         print(f"Error parsing file {filename}: {str(e)}")
         raise ValueError(f"Error while parsing file {filename}: {str(e)}")
+
+
+def _merge_signature_dataframes(named_dfs):
+    """
+    named_dfs: list of (filename, df) tuples, each df having a 'Type' column.
+
+    Merges them into a single DataFrame aligned on 'Type' (outer join,
+    missing values filled with 0). Column name collisions across files are
+    disambiguated by prefixing the column with its source filename.
+
+    Returns a DataFrame with 'Type' as a regular column (index reset).
+    """
+    dfs = []
+    seen_columns = set()
+
+    for filename, df in named_dfs:
+        df = df.set_index('Type')
+        base_name = filename.rsplit('.', 1)[0] if '.' in filename else filename
+        rename_map = {col: f"{base_name}_{col}" for col in df.columns if col in seen_columns}
+        if rename_map:
+            df = df.rename(columns=rename_map)
+        seen_columns.update(df.columns)
+        dfs.append(df)
+
+    merged = pd.concat(dfs, axis=1, join='outer').fillna(0)
+    merged.index.name = 'Type'
+    return merged.reset_index()
+
+
+def merge_uploaded_signatures(contents_list, filenames_list):
+    """
+    Parse one or more uploaded signature files and merge them into a single
+    DataFrame indexed by mutation 'Type'. Files are aligned on 'Type' (outer
+    join, missing values filled with 0). Column name collisions across files
+    are disambiguated by prefixing the column with its source filename.
+
+    Returns (merged_df, errors), where merged_df has 'Type' as a regular
+    column (index reset) ready for to_dict('records'), and errors is a list
+    of (filename, message) tuples for files that failed to parse. merged_df
+    is None if every file failed.
+    """
+    named_dfs = []
+    errors = []
+
+    for content, filename in zip(contents_list, filenames_list):
+        try:
+            df = parse_signatures(content, filename)
+        except Exception as e:
+            errors.append((filename, str(e)))
+            continue
+        named_dfs.append((filename, df))
+
+    if not named_dfs:
+        return None, errors
+
+    return _merge_signature_dataframes(named_dfs), errors
+
+
+# Bundled example signature files (data/signatures/) offered as a one-click
+# "Load Example" demo of merging multiple datasets for clustering.
+EXAMPLE_SIGNATURE_FILES = [
+    'COSMIC_v3.4_SBS_GRCh37.txt',
+    'Kucab2019-sub_signature.txt',
+    'Zou2018-signatures.SBS-96.tsv',
+]
+
+
+def load_example_merged_signatures(base_dir='data/signatures'):
+    """Read and merge the bundled example signature files from disk, the
+    same way merge_uploaded_signatures merges user-uploaded files."""
+    named_dfs = []
+    for filename in EXAMPLE_SIGNATURE_FILES:
+        sep = ',' if filename.endswith('.csv') else '\t'
+        df = pd.read_csv(f'{base_dir}/{filename}', sep=sep)
+        named_dfs.append((filename, df))
+
+    return _merge_signature_dataframes(named_dfs)
