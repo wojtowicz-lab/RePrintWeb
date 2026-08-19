@@ -1,3 +1,4 @@
+import colorsys
 import itertools
 
 import numpy as np
@@ -7,13 +8,23 @@ from networkx.algorithms.community import louvain_communities, modularity
 
 from utils.utils import calculate_rmse
 
-# Qualitative palette for community colors, cycled if there are more
-# communities than colors.
+# Qualitative palette for community colors, used as-is up to this many
+# groups; beyond that palette() generates evenly spaced hues instead.
 COMMUNITY_COLORS = [
     '#2563EB', '#E11D48', '#14B8A6', '#F59E0B', '#8B5CF6',
     '#10B981', '#EF4444', '#3B82F6', '#EC4899', '#84CC16',
     '#06B6D4', '#F97316',
 ]
+
+
+def palette(n):
+    if n <= len(COMMUNITY_COLORS):
+        return COMMUNITY_COLORS[:n]
+    colors = []
+    for i in range(n):
+        r, g, b = colorsys.hls_to_rgb(i / n, 0.55, 0.65)
+        colors.append('#{:02x}{:02x}{:02x}'.format(int(r * 255), int(g * 255), int(b * 255)))
+    return colors
 
 
 def _pairwise_distance_matrix(df, calc_func):
@@ -124,8 +135,15 @@ def _community_cluster_layout(G, node_communities, seed=42):
     those, so communities land far apart from each other.
     Step 2: spring-layout each community's own nodes in isolation, then
     scale/offset that local layout around its super-node's position.
+
+    `node_communities` may cover more nodes than G has (the caller reuses
+    one global community map across each connected component separately) -
+    community ids are restricted to G's own nodes below, otherwise a
+    community with zero members in this particular G would still get a
+    meta-graph slot and an empty local layout, which both wastes space and
+    divides by zero when sizing that (empty) local layout.
     """
-    communities = sorted(set(node_communities.values()))
+    communities = sorted({node_communities[n] for n in G.nodes()})
     members_by_community = {cid: [n for n in G.nodes() if node_communities[n] == cid] for cid in communities}
 
     if len(communities) <= 1:
@@ -184,38 +202,84 @@ def _community_cluster_layout(G, node_communities, seed=42):
     return positions
 
 
+def _pack_components(footprints, gap=0.8):
+    """
+    Shelf-pack a list of (positions_dict, width, height) - each already in
+    its own local 0..width x 0..height coordinates - left to right, wrapping
+    to a new row once a row gets too wide. Used so unrelated connected
+    components (which share no edge, so nothing should pull them toward
+    each other) end up as a tidy tiled grid instead of positioned by
+    whatever spring_layout does with no force acting between them - the
+    single biggest source of "this graph looks like it exploded randomly"
+    complaints, since a naive layout is free to fling disconnected pieces
+    arbitrarily far apart.
+    """
+    positions = {}
+    if not footprints:
+        return positions
+
+    footprints = sorted(footprints, key=lambda t: -(t[1] * t[2]))
+    total_area = sum(w * h for _, w, h in footprints)
+    row_width = max(6.0, np.sqrt(total_area) * 1.8)
+
+    cursor_x, cursor_y, row_height = 0.0, 0.0, 0.0
+    for local_pos, w, h in footprints:
+        if cursor_x > 0 and cursor_x + w > row_width:
+            cursor_x = 0.0
+            cursor_y -= row_height + gap
+            row_height = 0.0
+        for n, (x, y) in local_pos.items():
+            positions[n] = (cursor_x + x, cursor_y + y)
+        cursor_x += w + gap
+        row_height = max(row_height, h)
+
+    return positions
+
+
 def _compute_layout(G, node_communities, seed=42):
     """
-    Layout entry point. Nodes with no surviving edge (isolated by the
-    similarity threshold, or a singleton community) are handled separately
-    from the rest: spring_layout applies no force to them, so it leaves them
-    wherever it happened to start them - which looks like a rendering glitch
-    (overlapping other nodes, oddly far away, inconsistent between otherwise
-    -similar runs). Instead they're placed in a tidy row beneath the main
-    layout, where their position is at least legible even though it carries
-    no similarity information. Everything else is laid out community-first
-    (see _community_cluster_layout) so same-color nodes stay visually
-    grouped.
+    Layout entry point. Real connected components of G share no edge with
+    each other, so nothing should visually pull them apart or together -
+    each is laid out on its own (community-first, via
+    _community_cluster_layout, when it spans more than one community), then
+    all of them are shelf-packed into a grid (_pack_components) rather than
+    positioned by a force layout that has no basis for placing unconnected
+    pieces sensibly. Singleton components (a node with no surviving edge at
+    all) go in their own tidy row beneath everything else, since even a
+    1-node "component layout" carries no meaningful shape.
     """
+    components = [c for c in nx.connected_components(G) if len(c) > 1]
     isolated = sorted(n for n in G.nodes() if G.degree(n) == 0)
-    connected_nodes = [n for n in G.nodes() if G.degree(n) > 0]
 
-    positions = {}
-    if connected_nodes:
-        subG = G.subgraph(connected_nodes)
-        positions = _community_cluster_layout(subG, node_communities, seed=seed)
-        xs = [p[0] for p in positions.values()]
-        ys = [p[1] for p in positions.values()]
-        x_min, x_max = min(xs), max(xs)
-        y_min = min(ys)
-        width = max(x_max - x_min, 1e-6)
-    else:
-        x_min, width, y_min = 0.0, 1.0, 0.0
+    footprints = []
+    for comp_nodes in components:
+        subG = G.subgraph(comp_nodes)
+        if len({node_communities[n] for n in comp_nodes}) > 1:
+            local_pos = _community_cluster_layout(subG, node_communities, seed=seed)
+        else:
+            k = 2.2 / np.sqrt(len(comp_nodes))
+            local_pos = nx.spring_layout(subG, weight='weight', seed=seed, k=k, iterations=200)
+
+        xs = [p[0] for p in local_pos.values()]
+        ys = [p[1] for p in local_pos.values()]
+        x_min, y_min = min(xs), min(ys)
+        w = max(max(xs) - x_min, 0.6)
+        h = max(max(ys) - y_min, 0.6)
+        local_pos = {n: (x - x_min, y - y_min) for n, (x, y) in local_pos.items()}
+        footprints.append((local_pos, w, h))
+
+    positions = _pack_components(footprints)
 
     if isolated:
+        if positions:
+            xs = [p[0] for p in positions.values()]
+            ys = [p[1] for p in positions.values()]
+            x_min, width, y_min = min(xs), max(max(xs) - min(xs), 1.0), min(ys)
+        else:
+            x_min, width, y_min = 0.0, 4.0, 0.0
+
         cols = max(1, int(np.ceil(np.sqrt(len(isolated) * 1.5))))
-        cell = width / cols if connected_nodes else 1.0
-        cell = max(cell, 0.15)
+        cell = max(width / cols, 0.4)
         for idx, node in enumerate(isolated):
             row, col = divmod(idx, cols)
             positions[node] = (x_min + col * cell, y_min - cell * 1.5 * (row + 1))
@@ -235,8 +299,15 @@ def _marker_style(n_nodes):
     return dict(marker_size=7, font_size=7, show_labels=False)
 
 
-def create_community_graph_figure(G, communities, mod_score, seed=42, title=''):
-    """Node-link plot of G, nodes colored by their Louvain community."""
+def create_community_graph_figure(G, communities, mod_score, seed=42, title='', community_labels=None, unit_noun='community'):
+    """
+    Node-link plot of G, nodes colored by group. `communities` is
+    Louvain output by default, but any list[set[node]] partition works -
+    e.g. groups known in advance from the data itself (see
+    utils/organ_network.py), in which case pass `community_labels` (one
+    string per group, same order as `communities`) to name them instead of
+    "Community N".
+    """
     if G.number_of_nodes() == 0:
         return empty_community_fig()
 
@@ -279,9 +350,11 @@ def create_community_graph_figure(G, communities, mod_score, seed=42, title=''):
         ),
     ]
 
+    colors = palette(len(communities))
     for cid, members in enumerate(communities, start=1):
         members = sorted(members)
-        color = COMMUNITY_COLORS[(cid - 1) % len(COMMUNITY_COLORS)]
+        color = colors[cid - 1]
+        label = community_labels[cid - 1] if community_labels else f"Community {cid}"
         traces.append(go.Scatter(
             x=[pos[m][0] for m in members],
             y=[pos[m][1] for m in members],
@@ -290,12 +363,13 @@ def create_community_graph_figure(G, communities, mod_score, seed=42, title=''):
             textposition='top center',
             textfont=dict(size=style['font_size']),
             marker=dict(size=style['marker_size'], color=color, line=dict(width=1.5, color='white')),
-            name=f"Community {cid} (n={len(members)})",
-            hovertext=[f"{m}<br>Community {cid}" for m in members],
+            name=f"{label} (n={len(members)})",
+            hovertext=[f"{m}<br>{label}" for m in members],
             hoverinfo='text',
         ))
 
-    subtitle = f"{len(communities)} communit{'y' if len(communities) == 1 else 'ies'}"
+    noun = unit_noun if len(communities) == 1 else (f"{unit_noun[:-1]}ies" if unit_noun.endswith('y') else f"{unit_noun}s")
+    subtitle = f"{len(communities)} {noun}"
     if mod_score is not None:
         subtitle += f" · modularity {mod_score:.3f}"
     full_title = f"{title}<br><span style='font-size:11px;color:#6B7280'>{subtitle}</span>" if title else subtitle

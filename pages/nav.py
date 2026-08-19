@@ -110,6 +110,20 @@ navbar = html.Header(
                         style=NAVBAR_LINK_STYLES,
                         className="navbar-link"
                     ),
+                    Link(
+                        children=dmc.Group(
+                            gap=6,
+                            align="center",
+                            children=[
+                                DashIconify(icon="tabler:topology-star-3", width=18, height=18),
+                                dmc.Text("Organ Network", size="sm", fw=600),
+                            ],
+                        ),
+                        href="/organ-network",
+                        id="nav-organ-network",
+                        style=NAVBAR_LINK_STYLES,
+                        className="navbar-link"
+                    ),
                 ]
             ),
         ]
