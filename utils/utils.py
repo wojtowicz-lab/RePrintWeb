@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 
 FILES = [
+    'COSMIC_v3.6_SBS_GRCh38.txt',
+    'COSMIC_v3.5_SBS_GRCh38.txt',
     'COSMIC_v3.4_SBS_GRCh38.txt',
     'COSMIC_v3.3.1_SBS_GRCh38.txt',
     'COSMIC_v3.2_SBS_GRCh38.txt',
@@ -10,6 +12,8 @@ FILES = [
     'COSMIC_v2_SBS_GRCh38.txt',
     'COSMIC_v1_SBS_GRCh38.txt',
 
+    'COSMIC_v3.6_SBS_GRCh37.txt',
+    'COSMIC_v3.5_SBS_GRCh37.txt',
     'COSMIC_v3.4_SBS_GRCh37.txt',
     'COSMIC_v3.3.1_SBS_GRCh37.txt',
     'COSMIC_v3.2_SBS_GRCh37.txt',
