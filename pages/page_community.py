@@ -1,9 +1,10 @@
-from utils.community import detect_communities, create_community_graph_figure, empty_community_fig
+from utils.community import (detect_communities, create_community_graph_figure, empty_community_fig,
+                             DEFAULT_K)
 from utils.utils import (FILES, DEFAULT_SIGNATURES, reprint, calculate_rmse, calculate_cosine,
                           calculate_js_divergence, parse_signatures, merge_uploaded_signatures,
-                          load_example_merged_signatures, EXAMPLE_SIGNATURE_FILES)
+                          load_example_merged_signatures, EXAMPLE_SIGNATURE_SETS)
 from main import app
-from dash import dcc, html, Input, Output, State, ctx
+from dash import dcc, html, Input, Output, State
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
 from pages.nav import navbar
@@ -16,6 +17,18 @@ for file in FILES:
     data[file] = pd.read_csv(f'data/signatures/{file}', sep='\t').columns[1:].to_list()
 
 dropdown_options = [{'label': file, 'value': file} for file in FILES]
+
+# The page opens on this bundled example rather than on a bare reference
+# file: it is small enough to read at a glance and its DNA-repair knockouts
+# give the communities an obvious meaning (see EXAMPLE_SIGNATURE_SETS).
+DEFAULT_EXAMPLE_SET = 'cosmic_v2_zou'
+_example_df, _example_files = load_example_merged_signatures(example_set=DEFAULT_EXAMPLE_SET)
+DEFAULT_EXAMPLE_SIGNATURES = [c for c in _example_df.columns if c != 'Type']
+DEFAULT_EXAMPLE_STORE = {
+    'signatures_data': _example_df.to_dict('records'),
+    'filename': _example_files,
+    'info': f"Loaded example dataset ({EXAMPLE_SIGNATURE_SETS[DEFAULT_EXAMPLE_SET]['label']}): {', '.join(_example_files)}",
+}
 
 DISTANCE_FUNCTIONS = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
 
@@ -81,9 +94,16 @@ page_community_layout = html.Div([
                                                         html.H6("1. What this does", style={"fontWeight": "600", "marginBottom": "1rem"}),
                                                         html.P(
                                                             "Instead of cutting a dendrogram (as on the RePrints charts page), this page builds a "
-                                                            "weighted similarity graph over your signatures and runs the Louvain algorithm to find "
-                                                            "groups of signatures that are more similar to each other than to the rest — "
-                                                            "\"communities\" — by maximizing modularity.",
+                                                            "mutual k-nearest-neighbour similarity graph over your signatures and runs the Louvain "
+                                                            "algorithm to find groups of signatures that are more similar to each other than to the "
+                                                            "rest — \"communities\" — by maximizing modularity.",
+                                                            style={"fontSize": "0.95rem", "color": COLORS["text_primary"]}
+                                                        ),
+                                                        html.P(
+                                                            "Each signature keeps an edge to its k most similar neighbours, and the edge survives only "
+                                                            "if both signatures picked each other. That criterion is local, so a tightly-packed family "
+                                                            "and a looser one can both stay visible at the same k — unlike a single global similarity "
+                                                            "cutoff, which resolves one only by dissolving the other.",
                                                             style={"fontSize": "0.95rem", "color": COLORS["text_primary"]}
                                                         ),
                                                         html.P(
@@ -99,7 +119,8 @@ page_community_layout = html.Div([
                                                         html.H6("2. Parameters", style={"fontWeight": "600", "marginBottom": "1rem"}),
                                                         html.Ul([
                                                             html.Li([html.Strong("Resolution: "), "higher values favor more, smaller communities; lower values favor fewer, larger ones."], style={"marginBottom": "0.5rem", "fontSize": "0.9rem"}),
-                                                            html.Li([html.Strong("Minimum Similarity: "), "hides weak edges before running Louvain, giving a sparser, easier-to-read graph."], style={"marginBottom": "0.5rem", "fontSize": "0.9rem"}),
+                                                            html.Li([html.Strong("Neighbours (k): "), "how many nearest neighbours each signature keeps. Low k gives a sparse graph where distinct families stay apart; raising k merges them."], style={"marginBottom": "0.5rem", "fontSize": "0.9rem"}),
+                                                            html.Li([html.Strong("Mutual neighbours only: "), "keeps an edge only when both signatures rank each other in their top k. Off, one signature can drag an unrelated neighbour into its community."], style={"marginBottom": "0.5rem", "fontSize": "0.9rem"}),
                                                             html.Li([html.Strong("Random Seed: "), "Louvain's greedy optimization and the graph layout are randomized; fixing the seed makes runs reproducible."], style={"fontSize": "0.9rem"}),
                                                         ], style={"paddingLeft": "1.5rem"}),
                                                     ]
@@ -176,9 +197,9 @@ page_community_layout = html.Div([
                             dmc.Text("Select Signatures", size="sm", fw=600),
                             dcc.Dropdown(
                                 id='signatures-dropdown-community',
-                                options=[{'label': k, 'value': k} for k in data[DEFAULT_SIGNATURES]],
+                                options=[{'label': k, 'value': k} for k in DEFAULT_EXAMPLE_SIGNATURES],
                                 multi=True,
-                                value=[k for k in data[DEFAULT_SIGNATURES]],
+                                value=list(DEFAULT_EXAMPLE_SIGNATURES),
                                 placeholder="Choose signatures...",
                                 style={"minWidth": "200px"},
                             ),
@@ -215,15 +236,16 @@ page_community_layout = html.Div([
                     dmc.Divider(label="or", labelPosition="center"),
                     html.Div(style={"marginTop": "1.25rem"}),
                     dmc.Button(
-                        "Load Example (COSMIC + Kucab2019 + Zou2018)",
+                        f"Load Example ({EXAMPLE_SIGNATURE_SETS[DEFAULT_EXAMPLE_SET]['label']})",
                         id="load-example-btn-community",
                         variant="outline",
-                        color="blue",
+                        color="teal",
                         size="md",
-                        leftSection=DashIconify(icon="tabler:flask", width=18),
+                        leftSection=DashIconify(icon="tabler:dna-2", width=18),
                     ),
                     dmc.Text(
-                        "Loads and merges 3 bundled signature datasets so you can try community detection right away.",
+                        f"{EXAMPLE_SIGNATURE_SETS[DEFAULT_EXAMPLE_SET]['blurb']} "
+                        "This example is loaded by default; click to reload it after uploading your own files.",
                         size="xs",
                         c="dimmed",
                         style={"marginTop": "0.5rem"}
@@ -249,7 +271,7 @@ page_community_layout = html.Div([
 
             html.Div(id='upload-error-message-community'),
             html.Div(id='info_uploader-community'),
-            dcc.Store(id='session-community-signatures', storage_type='session', data=None),
+            dcc.Store(id='session-community-signatures', storage_type='session', data=DEFAULT_EXAMPLE_STORE),
             dcc.Interval(id='initial-load-community', interval=1000, n_intervals=0, max_intervals=1),
             dcc.Store(id='auto-reload-armed-community', data=False),
             dcc.Store(id='reload-signal-community', data=0),
@@ -395,22 +417,45 @@ page_community_layout = html.Div([
                                     dmc.GridCol(
                                         span=12,
                                         children=[
-                                            dmc.Text("Minimum Similarity to Draw an Edge", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
+                                            dmc.Text("Neighbours per Signature (k)", size="sm", fw=600, style={"marginBottom": "0.5rem"}),
                                             dmc.Slider(
-                                                id="min-similarity-community",
-                                                value=0.4,
-                                                min=0.0,
-                                                max=0.9,
-                                                step=0.05,
+                                                id="k-neighbours-community",
+                                                value=DEFAULT_K,
+                                                min=2,
+                                                max=10,
+                                                step=1,
                                                 marks=[
-                                                    {"value": 0.0, "label": "Fully connected"},
-                                                    {"value": 0.4, "label": "Default"},
-                                                    {"value": 0.9, "label": "Sparse"},
+                                                    {"value": 2, "label": "Sparse"},
+                                                    {"value": DEFAULT_K, "label": "Default"},
+                                                    {"value": 10, "label": "Dense"},
                                                 ],
                                                 style={"width": "100%", "marginBottom": "1.5rem"}
                                             ),
                                             dmc.Text(
-                                                "Pairs with similarity below this are not connected, before Louvain runs. A fully connected graph (0.0) tends to produce near-zero modularity since there are no real gaps to detect; raising the threshold reveals structure. Default: 0.4",
+                                                "Each signature is connected to its k most similar neighbours. Because the cutoff is per-signature "
+                                                "rather than global, a tightly-packed family and a looser one can both hold together at the same k. "
+                                                "Raise k if too many signatures sit alone; lower it if everything collapses into one community. "
+                                                f"Default: k = {DEFAULT_K}",
+                                                size="xs",
+                                                c="dimmed",
+                                                style={"marginTop": "0.5rem"}
+                                            ),
+                                        ]
+                                    ),
+                                    dmc.GridCol(
+                                        span=12,
+                                        children=[
+                                            dmc.Switch(
+                                                id="mutual-knn-community",
+                                                checked=True,
+                                                label="Mutual neighbours only",
+                                                size="sm",
+                                                style={"marginBottom": "0.5rem"}
+                                            ),
+                                            dmc.Text(
+                                                "Keep an edge only when both signatures rank each other within their top k. This is the stricter, "
+                                                "recommended setting: it stops a signature with no close relatives from attaching itself to a "
+                                                "well-formed community. Turn it off for a denser, more connected graph.",
                                                 size="xs",
                                                 c="dimmed",
                                                 style={"marginTop": "0.5rem"}
@@ -593,16 +638,17 @@ def load_example_dataset_community(n_clicks):
     if not n_clicks:
         return dash.no_update, dash.no_update, dash.no_update
 
-    df_signatures = load_example_merged_signatures()
-    info = f"Loaded example dataset: {', '.join(EXAMPLE_SIGNATURE_FILES)}"
+    label = EXAMPLE_SIGNATURE_SETS[DEFAULT_EXAMPLE_SET]['label']
+    filenames = DEFAULT_EXAMPLE_STORE['filename']
     alert = dmc.Alert(
-        f"Loaded example dataset ({len(EXAMPLE_SIGNATURE_FILES)} files merged): {', '.join(EXAMPLE_SIGNATURE_FILES)}",
+        f"Loaded {label} — {len(filenames)} files merged into "
+        f"{len(DEFAULT_EXAMPLE_SIGNATURES)} profiles: {', '.join(filenames)}",
         icon=DashIconify(icon="tabler:check-circle", width=18),
         title="Example Loaded",
         color="blue",
         withCloseButton=True
     )
-    return {'signatures_data': df_signatures.to_dict('records'), 'filename': EXAMPLE_SIGNATURE_FILES, 'info': info}, alert, True
+    return DEFAULT_EXAMPLE_STORE, alert, True
 
 
 @app.callback(
@@ -741,7 +787,8 @@ def _community_badges(communities):
      State('distance-metric-community', 'value'),
      State('epsilon-community', 'value'),
      State('resolution-community', 'value'),
-     State('min-similarity-community', 'value'),
+     State('k-neighbours-community', 'value'),
+     State('mutual-knn-community', 'checked'),
      State('seed-community', 'value'),
      State('session-community-signatures', 'data'),
      ],
@@ -751,12 +798,14 @@ def _community_badges(communities):
     ],
 )
 def update_community_output(init_load, reload_signal, n_clicks, selected_file, selected_signatures,
-                             distance_metric, epsilon, resolution, min_similarity, seed, signatures):
+                             distance_metric, epsilon, resolution, k_neighbours, mutual, seed, signatures):
     if not selected_signatures or not selected_file:
         return '', dash.no_update, dash.no_update, '', '', dash.no_update
 
     calc_func = DISTANCE_FUNCTIONS[distance_metric]
     seed = int(seed) if seed is not None else 42
+    k_neighbours = int(k_neighbours) if k_neighbours else DEFAULT_K
+    mutual = bool(mutual)
 
     if signatures is not None:
         data_df = pd.DataFrame(signatures['signatures_data'])
@@ -768,9 +817,9 @@ def update_community_output(init_load, reload_signal, n_clicks, selected_file, s
     df_reprint = reprint(data_df, epsilon=epsilon)
 
     G_sig, communities_sig, community_of_sig, mod_sig = detect_communities(
-        data_df, calc_func=calc_func, resolution=resolution, min_similarity=min_similarity, seed=seed)
+        data_df, calc_func=calc_func, resolution=resolution, k=k_neighbours, mutual=mutual, seed=seed)
     G_rep, communities_rep, community_of_rep, mod_rep = detect_communities(
-        df_reprint, calc_func=calc_func, resolution=resolution, min_similarity=min_similarity, seed=seed)
+        df_reprint, calc_func=calc_func, resolution=resolution, k=k_neighbours, mutual=mutual, seed=seed)
 
     fig_sig = create_community_graph_figure(G_sig, communities_sig, mod_sig, seed=seed, title="Signatures")
     fig_rep = create_community_graph_figure(G_rep, communities_rep, mod_rep, seed=seed, title="RePrints")
@@ -782,7 +831,8 @@ def update_community_output(init_load, reload_signal, n_clicks, selected_file, s
     }
 
     summary = (f"Distance Metric: {distance_metric}, Resolution: {resolution}, "
-               f"Min Similarity: {min_similarity}, Seed: {seed}")
+               f"Neighbours (k): {k_neighbours}"
+               f"{' mutual' if mutual else ''}, Seed: {seed}")
 
     return (summary, fig_sig, fig_rep,
             _community_badges(communities_sig), _community_badges(communities_rep),
@@ -795,7 +845,8 @@ def update_community_output(init_load, reload_signal, n_clicks, selected_file, s
     [Input('distance-metric-community', 'value'),
      Input('epsilon-community', 'value'),
      Input('resolution-community', 'value'),
-     Input('min-similarity-community', 'value'),
+     Input('k-neighbours-community', 'value'),
+     Input('mutual-knn-community', 'checked'),
      Input('seed-community', 'value')],
     prevent_initial_call=True
 )

@@ -1,5 +1,5 @@
 import plotly.figure_factory as ff
-from scipy.spatial.distance import squareform
+from scipy.spatial.distance import squareform, pdist
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from utils.utils import calculate_rmse
@@ -22,6 +22,34 @@ ALL_CONTEXT_LABELS = C_CONTEXT_LABELS + T_CONTEXT_LABELS
 
 # Short axis labels for 96-context signature plot (same style as reprint: trinucleotide context)
 SIGNATURE_X_LABELS = C_CONTEXT_LABELS * 3 + T_CONTEXT_LABELS * 3  # 96 labels matching CONTEXTS order
+
+DENDRO_LINE_COLOR = "#3f3f3f"
+# Vertical layout of a clustermap, in paper fractions: matrix, cluster strip,
+# top dendrogram. The strip is drawn as paper-referenced shapes rather than its
+# own axis, which would collapse and break the render in a short container.
+MATRIX_Y1 = 0.82
+STRIP_Y0, STRIP_Y1 = 0.828, 0.855
+TOP_DENDRO_Y0 = 0.865
+# Floor for the rendered figure box. Rotated tick labels claim ~150-190px of
+# margin via automargin; below roughly 500px of box the remaining plot area is
+# too small for plotly to scale the stacked axes and it aborts the whole render
+# ("Something went wrong with axis scaling"), so never hand it a smaller box.
+MIN_FIGURE_SIZE = 640
+# ColorBrewer 9-class ramps, the ones the published COSMIC+Enviro+KO figures
+# use: GnBu for the raw-signature distance matrix, OrRd for the RePrint one.
+# Both are applied with reversescale=True, so a distance of 0 is the darkest
+# end and the diagonal reads as a dark line, exactly as in the paper.
+GNBU_9 = ['#F7FCF0', '#E0F3DB', '#CCEBC5', '#A8DDB5', '#7BCCC4',
+          '#4EB3D3', '#2B8CBE', '#0868AC', '#084081']
+ORRD_9 = ['#FFF7EC', '#FEE8C8', '#FDD49E', '#FDBB84', '#FC8D59',
+          '#EF6548', '#D7301F', '#B30000', '#7F0000']
+
+CLUSTER_STRIP_PALETTE = [
+    "#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3",
+    "#937860", "#DA8BC3", "#8C8C8C", "#CCB974", "#64B5CD",
+    "#A1C9F4", "#FFB482", "#8DE5A1", "#FF9F9B", "#D0BBFF",
+    "#DEBB9B", "#FAB0E4", "#CFCFCF", "#FFFEA3", "#B9F2F0",
+]
 
 # Keep legend styling consistent across all mutation plots.
 MUTATION_LEGEND = dict(
@@ -325,27 +353,39 @@ def create_reprint_footprint_figure(df_reprint, signature, title=None, show_x_la
     return fig
 
 
-def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blues', hide_heatmap=False, method='complete', cluster_threshold_frac=0.7, metric_label='Similarity'):
+def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blues', hide_heatmap=False, method='complete', cluster_threshold_frac=0.7, metric_label='Similarity', annotation_groups=None):
+    """Clustered distance-matrix heatmap, built the way the RePrint paper's
+    figures are.
+
+    annotation_groups: optional [{'name', 'color', 'members': [...]}, ...].
+    When given, the strip above the matrix colours each column by the fixed
+    group it belongs to (blank for columns in no group) instead of by the
+    clusters cut out of this particular dendrogram.
+    """
     # Transpose data and get labels
     df = df.T
     labels = df.index.tolist()
 
-    # Responsive sizing based on number of signatures
     n = df.shape[0]
     if n <= 10:
         px_per_label = 55
         label_font_size = 11
     elif n <= 20:
         px_per_label = 40
-        label_font_size = 9
+        label_font_size = 10
     elif n <= 40:
         px_per_label = 28
-        label_font_size = 7
+        label_font_size = 9
     else:
-        px_per_label = 20
-        label_font_size = 6
+        px_per_label = 18
+        label_font_size = 8
 
-    responsive_size = max(500, min(1400, px_per_label * n + 150))
+    max_size = max(MIN_FIGURE_SIZE, min(2200, px_per_label * n + 150))
+    min_size = max(MIN_FIGURE_SIZE, min(max_size, 13 * n + 160))
+    size_meta = {'min_size': min_size, 'max_size': max_size}
+    # Feed calc_func plain numpy rows rather than df.iloc slices: same numbers,
+    # about ten times faster, which matters at the paper's 102 signatures.
+    values = df.to_numpy()
     dist_matrix = np.zeros((n, n))
     for i in range(n):
         for j in range(i + 1, n):
@@ -361,7 +401,7 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
         # bottom, tree growing upward).
         fig = ff.create_dendrogram(df.values, labels=labels, orientation='bottom', linkagefun=lambda _: Z)
 
-        fig.update_layout({'width': responsive_size, 'height': responsive_size,
+        fig.update_layout({'autosize': True, 'meta': size_meta,
                            'showlegend': False, 'hovermode': 'closest',
                            'margin': dict(l=50, r=50, t=60, b=50),
                            })
@@ -371,6 +411,7 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
                                  'showline': False,
                                  'zeroline': False,
                                  'showticklabels': True,
+                                 'automargin': True,
                                  })
         fig.update_layout(yaxis={'domain': [0, 1],
                                  'mirror': False,
@@ -389,18 +430,23 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
 
         return fig
 
-    # Create bottom dendrogram
+    # Top dendrogram (leaves at the bottom, root growing up), drawn on y2 above
+    # the matrix so the column order is readable as a tree.
     fig = ff.create_dendrogram(df.values, labels=labels, orientation='bottom', linkagefun=lambda _: Z)
-    fig.for_each_trace(lambda trace: trace.update(visible=False))
+    for trace in fig['data']:
+        trace['yaxis'] = 'y2'
+        trace['line']['color'] = DENDRO_LINE_COLOR
+        trace['line']['width'] = 1
+        trace['hoverinfo'] = 'skip'
 
-    # Create side dendrogram
+    # Side dendrogram, drawn on x2 to the left of the matrix
     dendro_side = ff.create_dendrogram(df.values, orientation='right', linkagefun=lambda _: Z)
-    for i in range(len(dendro_side['data'])):
-        dendro_side['data'][i]['xaxis'] = 'x2'
-
-    # Add side dendrogram data to the figure
-    for data in dendro_side['data']:
-        fig.add_trace(data)
+    for trace in dendro_side['data']:
+        trace['xaxis'] = 'x2'
+        trace['line']['color'] = DENDRO_LINE_COLOR
+        trace['line']['width'] = 1
+        trace['hoverinfo'] = 'skip'
+        fig.add_trace(trace)
     dendro_leaves = dendro_side['layout']['yaxis']['ticktext']
     dendro_leaves = list(map(int, dendro_leaves))
 
@@ -408,26 +454,33 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
     heat_data = dist_matrix[dendro_leaves, :]
     heat_data = heat_data[:, dendro_leaves]
 
-    # Group signatures into clusters by cutting the dendrogram at a fraction
-    # of its tallest merge distance. Lower cluster_threshold_frac cuts earlier
-    # (smaller distance) and yields more, smaller clusters.
     cluster_threshold = cluster_threshold_frac * Z[:, 2].max()
     cluster_ids = fcluster(Z, t=cluster_threshold, criterion='distance')
     ordered_cluster_ids = [cluster_ids[leaf] for leaf in dendro_leaves]
 
-    # Per-cell cluster membership list, attached as customdata so hovering
-    # any cell of a cluster's block reliably shows all its signatures -
-    # this rides on the heatmap's own per-cell hover instead of a separate
-    # overlay trace, so it works no matter how large the cluster's block is.
+
     ordered_labels = [labels[leaf] for leaf in dendro_leaves]
     cluster_members = {}
     for cid in set(ordered_cluster_ids):
         members = [lbl for lbl, c in zip(ordered_labels, ordered_cluster_ids) if c == cid]
         cluster_members[cid] = f"<br><br>Cluster ({len(members)} signatures):<br>" + "<br>".join(members) if len(members) > 1 else ""
 
+    group_of = {}
+    for group in (annotation_groups or []):
+        for member in group['members']:
+            group_of[member] = group['name']
+    group_notes = [
+        f"<br>Group: {group_of[lbl]}" if lbl in group_of else ""
+        for lbl in ordered_labels
+    ]
+
     customdata = [
-        [cluster_members[row_c] if row_c == col_c else "" for col_c in ordered_cluster_ids]
-        for row_c in ordered_cluster_ids
+        [
+            [col_lbl, row_lbl, cluster_members[row_c] if row_c == col_c else "",
+             row_note]
+            for col_lbl, col_c in zip(ordered_labels, ordered_cluster_ids)
+        ]
+        for row_lbl, row_c, row_note in zip(ordered_labels, ordered_cluster_ids, group_notes)
     ]
 
     heatmap = [
@@ -438,11 +491,17 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
             reversescale=True,
             colorscale=colorscale,
             colorbar=dict(
-                x=1.2,
-                xpad=10
+                x=0.0, xanchor='left',
+                y=1.0, yanchor='top',
+                len=0.13, thickness=12,
+                title=dict(text=metric_label, side='top'),
+                tickfont=dict(size=max(7, label_font_size - 1)),
             ),
             customdata=customdata,
-            hovertemplate=f'x: %{{x}}<br>y: %{{y}}<br>{metric_label}: %{{z:.3f}}%{{customdata}}<extra></extra>'
+            hovertemplate=(
+                '%{customdata[1]} vs %{customdata[0]}%{customdata[3]}'
+                f'<br>{metric_label}: %{{z:.3f}}%{{customdata[2]}}<extra></extra>'
+            )
         )
     ]
 
@@ -453,73 +512,96 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
     for data in heatmap:
         fig.add_trace(data)
 
-    # Draw a border around each multi-signature cluster's block so the
-    # grouping is visible at a glance (purely decorative; hover is handled
-    # via customdata above).
     x_tickvals = list(heatmap[0]['x'])
-    y_tickvals = list(heatmap[0]['y'])
     half_dx = (x_tickvals[1] - x_tickvals[0]) / 2 if n > 1 else 5
-    half_dy = (y_tickvals[1] - y_tickvals[0]) / 2 if n > 1 else 5
+
+    if annotation_groups:
+        color_by_group = {g['name']: g['color'] for g in annotation_groups}
+        strip_colors = [color_by_group.get(group_of.get(lbl)) for lbl in ordered_labels]
+    else:
+        palette_slot = {}
+        strip_colors = []
+        cluster_sizes = {cid: ordered_cluster_ids.count(cid) for cid in set(ordered_cluster_ids)}
+        for cid in ordered_cluster_ids:
+            if cluster_sizes[cid] < 2:
+                strip_colors.append(None)
+                continue
+            if cid not in palette_slot:
+                palette_slot[cid] = len(palette_slot)
+            strip_colors.append(CLUSTER_STRIP_PALETTE[palette_slot[cid] % len(CLUSTER_STRIP_PALETTE)])
 
     start = 0
     for i in range(1, n + 1):
-        if i == n or ordered_cluster_ids[i] != ordered_cluster_ids[start]:
-            end = i - 1
-            if end > start:
-                x0, x1 = x_tickvals[start] - half_dx, x_tickvals[end] + half_dx
-                y0, y1 = y_tickvals[start] - half_dy, y_tickvals[end] + half_dy
-
+        if i == n or strip_colors[i] != strip_colors[start]:
+            if strip_colors[start] is not None:
                 fig.add_shape(
                     type="rect",
-                    x0=x0, x1=x1, y0=y0, y1=y1,
-                    xref="x", yref="y",
-                    line=dict(color="rgba(0,0,0,0.75)", width=2),
-                    fillcolor="rgba(0,0,0,0)",
+                    x0=x_tickvals[start] - half_dx, x1=x_tickvals[i - 1] + half_dx,
+                    y0=STRIP_Y0, y1=STRIP_Y1,
+                    xref="x", yref="paper",
+                    line=dict(width=0),
+                    fillcolor=strip_colors[start],
                     layer="above",
                 )
             start = i
 
+    fig.update_layout({'autosize': True, 'meta': size_meta,
+                       'showlegend': False, 'hovermode': 'closest',
+                       # automargin grows the edges that carry tick labels
+                       'margin': dict(l=10, r=10, t=20, b=10),
+                       })
+
+    # Matrix columns + bottom labels
     fig.update_layout(xaxis={'domain': [.15, 1],
                             'mirror': False,
                             'showgrid': False,
                             'showline': False,
                             'zeroline': False,
-                            'side': 'top',  # Ustawienie etykiet osi X na górze
-                            'tickvals': fig['layout']['xaxis']['tickvals'],
-                            'ticktext': [labels[i] for i in dendro_leaves]
+                            'side': 'bottom',
+                            'ticks': 'outside',
+                            'ticklen': 3,
+                            'tickangle': -90,
+                            'automargin': True,
+                            'tickvals': x_tickvals,
+                            'ticktext': ordered_labels,
                             })
 
-    fig.update_layout(xaxis2={'domain': [0, .15],
+    # Side dendrogram x
+    fig.update_layout(xaxis2={'domain': [0, .145],
                             'mirror': False,
                             'showgrid': False,
                             'showline': False,
                             'zeroline': False,
                             'showticklabels': False,
+                            'ticks': "",
                             })
 
-    fig.update_layout({'width': responsive_size, 'height': responsive_size,
-                       'showlegend': False, 'hovermode': 'closest',
-                       'margin': dict(l=50, r=50, t=60, b=50),
-                       })
-    fig.update_layout(yaxis={'domain': [0, 1],
+    # Matrix rows + right labels
+    fig.update_layout(yaxis={'domain': [0, MATRIX_Y1],
                              'mirror': False,
                              'showgrid': False,
                              'showline': False,
                              'zeroline': False,
                              'showticklabels': True,
+                             'ticks': 'outside',
+                             'ticklen': 3,
+                             'automargin': True,
                              'tickvals': dendro_side['layout']['yaxis']['tickvals'],
-                             'ticktext': [labels[i] for i in dendro_leaves],
+                             'ticktext': ordered_labels,
                              'side': 'right',
                              })
 
-    fig.update_layout(yaxis2={'domain': [.825, .975],
+    # Top dendrogram y
+    fig.update_layout(yaxis2={'domain': [TOP_DENDRO_Y0, 1],
+                              'anchor': 'x',
                               'mirror': False,
                               'showgrid': False,
                               'showline': False,
                               'zeroline': False,
-                              'showticklabels': True,
+                              'showticklabels': False,
                               'ticks': "",
                               })
+
 
     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)",
                       plot_bgcolor="rgba(0,0,0,0)")
