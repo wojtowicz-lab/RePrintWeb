@@ -96,6 +96,20 @@ navbar = html.Header(
                         style=NAVBAR_LINK_STYLES,
                         className="navbar-link"
                     ),
+                    Link(
+                        children=dmc.Group(
+                            gap=6,
+                            align="center",
+                            children=[
+                                DashIconify(icon="tabler:affiliate", width=18, height=18),
+                                dmc.Text("Community Detection", size="sm", fw=600),
+                            ],
+                        ),
+                        href="/community",
+                        id="nav-community",
+                        style=NAVBAR_LINK_STYLES,
+                        className="navbar-link"
+                    ),
                 ]
             ),
         ]

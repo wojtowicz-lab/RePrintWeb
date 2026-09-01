@@ -1,5 +1,7 @@
-from utils.figpanel import create_heatmap_with_custom_sim
+from utils.figpanel import create_heatmap_with_custom_sim, MIN_FIGURE_SIZE, GNBU_9, ORRD_9
 from utils.utils import FILES, DEFAULT_SIGNATURES, linkage_methods, DEFAULT_LINKAGE_METHOD, reprint, calculate_rmse, calculate_cosine, calculate_js_divergence
+from utils.utils import (example_set_options, DEFAULT_EXAMPLE_SET, EXAMPLE_SIGNATURE_SETS,
+                         LEGIBLE_SIGNATURE_LIMIT, PAPER_GOLD_STANDARD_GROUPS, PAPER_FIGURE_PRESET)
 from main import app
 from dash import dcc, html, Input, Output, State, ctx
 import dash_mantine_components as dmc
@@ -16,6 +18,14 @@ for file in FILES:
     data[file] = pd.read_csv(f'data/signatures/{file}', sep='\t').columns[1:].to_list()
 
 dropdown_options = [{'label': file, 'value': file} for file in FILES]
+
+# Example datasets offered by the loader below. Each entry carries its own
+# signature count and description so the picker can show what you are about to
+# load before you load it.
+EXAMPLE_SETS = example_set_options()
+EXAMPLE_SET_OPTIONS = [{'label': o['label'], 'value': o['value']} for o in EXAMPLE_SETS]
+EXAMPLE_SET_BLURBS = {o['value']: o['blurb'] for o in EXAMPLE_SETS}
+EXAMPLE_SET_COUNTS = {o['value']: o['count'] for o in EXAMPLE_SETS}
 
 
 # ============================================================================
@@ -83,7 +93,7 @@ page1_layout = html.Div([
                                                     html.Ol(
                                                         [
                                                             html.Li("Select a reference signature file from the first dropdown (e.g., COSMIC).", style={"marginBottom": "0.75rem"}),
-                                                            html.Li("Optionally upload your own query signatures using the drag-and-drop box — upload multiple files at once to merge them (aligned by mutation Type) before clustering.", style={"marginBottom": "0.75rem"}),
+                                                            html.Li("Or load a published dataset with the dataset picker, or upload your own query signatures using the drag-and-drop box — upload multiple files at once to merge them (aligned by mutation Type) before clustering.", style={"marginBottom": "0.75rem"}),
                                                             html.Li("Adjust advanced options (distance metric, clustering, epsilon), if needed.", style={"marginBottom": "0.75rem"}),
                                                             html.Li([
                                                                 html.Strong("Click "), "the ",
@@ -106,7 +116,7 @@ page1_layout = html.Div([
                                                             style={"marginBottom": "0.75rem", "fontSize": "0.95rem", "color": COLORS["text_primary"]}
                                                         ),
                                                         html.Li(
-                                                            [html.Strong("RMSE: "), "Root mean square error between normalized signatures"],
+                                                            [html.Strong("RMSE: "), "Root mean square error between the two probability vectors - the metric the RePrint paper reports"],
                                                             style={"marginBottom": "0.75rem", "fontSize": "0.95rem", "color": COLORS["text_primary"]}
                                                         ),
                                                         html.Li(
@@ -219,6 +229,7 @@ page1_layout = html.Div([
                                 placeholder="Choose signatures...",
                                 style={"minWidth": "200px"},
                             ),
+                            html.Div(id='signature-legibility-warning'),
                         ],
                         gap="xs",
                     ),
@@ -309,19 +320,54 @@ page1_layout = html.Div([
                     html.Div(style={"marginTop": "1.25rem"}),
                     dmc.Divider(label="or", labelPosition="center"),
                     html.Div(style={"marginTop": "1.25rem"}),
-                    dmc.Button(
-                        "Load Example (COSMIC + Kucab2019 + Zou2018)",
-                        id="load-example-btn",
-                        variant="outline",
-                        color="blue",
-                        size="md",
-                        leftSection=DashIconify(icon="tabler:flask", width=18),
-                    ),
-                    dmc.Text(
-                        "Loads and merges 3 bundled signature datasets so you can try clustering right away.",
-                        size="xs",
-                        c="dimmed",
-                        style={"marginTop": "0.5rem"}
+                    html.Div(
+                        style={
+                            "maxWidth": "560px",
+                            "margin": "0 auto",
+                            "textAlign": "left",
+                        },
+                        children=[
+                            dmc.Group(
+                                gap=8,
+                                align="center",
+                                justify="center",
+                                style={"marginBottom": "0.75rem"},
+                                children=[
+                                    DashIconify(icon="tabler:flask", width=18, color=COLORS["primary_blue"]),
+                                    dmc.Text("Load a published dataset", size="sm", fw=600),
+                                ],
+                            ),
+                            dcc.Dropdown(
+                                id="example-set-select",
+                                options=EXAMPLE_SET_OPTIONS,
+                                value=DEFAULT_EXAMPLE_SET,
+                                clearable=False,
+                                style={"textAlign": "left"},
+                            ),
+                            dmc.Text(
+                                EXAMPLE_SET_BLURBS[DEFAULT_EXAMPLE_SET],
+                                id="example-set-blurb",
+                                size="xs",
+                                c="dimmed",
+                                style={"marginTop": "0.5rem", "minHeight": "2.5rem"},
+                            ),
+                            dmc.Button(
+                                "Load dataset",
+                                id="load-example-btn",
+                                variant="outline",
+                                color="blue",
+                                size="md",
+                                leftSection=DashIconify(icon="tabler:download", width=18),
+                                style={"marginTop": "0.5rem", "width": "100%"},
+                            ),
+                            dmc.Text(
+                                "Signature sets from the RePrint paper (data/signatures/paper/), "
+                                "merged on mutation Type exactly like uploaded files.",
+                                size="xs",
+                                c="dimmed",
+                                style={"marginTop": "0.5rem", "textAlign": "center"},
+                            ),
+                        ],
                     ),
                     dmc.Button(
                         "Clear Uploaded Signatures",
@@ -492,6 +538,26 @@ page1_layout = html.Div([
                                             ),
                                         ]
                                     ),
+                                    dmc.GridCol(
+                                        span=12,
+                                        children=[
+                                            dmc.Switch(
+                                                id="paper-groups-switch",
+                                                checked=False,
+                                                label="Annotate the paper's gold-standard groups",
+                                                size="sm",
+                                            ),
+                                            dmc.Text(
+                                                "Colours the strip above the matrix by the reference group each signature "
+                                                "is expected to fall into (the published figure's annotation) instead of "
+                                                "by the clusters cut from this dendrogram. Only the 39 annotated "
+                                                "signatures are coloured; everything else stays blank.",
+                                                size="xs",
+                                                c="dimmed",
+                                                style={"marginTop": "0.5rem"}
+                                            ),
+                                        ]
+                                    ),
                                 ],
                                 grow=True,
                             ),
@@ -528,11 +594,17 @@ page1_layout = html.Div([
                 ]
             ),
             
+            # Gold-standard group legend, filled in only while the paper's
+            # annotation strip is switched on.
+            html.Div(id='gold-standard-legend'),
+
             # Heatmaps Grid
             dmc.Grid(
                 children=[
                     dmc.GridCol(
-                        span=6,
+                        # Full width: the clustered heatmaps run 1200-2200px
+                        # wide, so half-page columns can never fit them.
+                        span=12,
                         children=[
                             dmc.Card(
                                 style={
@@ -546,20 +618,27 @@ page1_layout = html.Div([
                                     dcc.Loading(
                                         id="loading-heatmap-plot",
                                         type="default",
-                                        children=dcc.Graph(
-                                            id='heatmap-plot',
-                                            config={
-                                                'displayModeBar': True,
-                                                'displaylogo': False,
-                                                'modeBarButtonsToAdd': ['toImage'],
-                                                'toImageButtonOptions': {
-                                                    'format': 'png',
-                                                    'filename': 'signature_similarity_heatmap',
-                                                    'height': 600,
-                                                    'width': 800,
-                                                    'scale': 2
+                                        # The graph autosizes to fill this wrapper; its
+                                        # style (set by the callback) clamps it between a
+                                        # readability floor and a max size, and anything
+                                        # below the floor scrolls here instead of clipping.
+                                        children=html.Div(
+                                            style={"overflowX": "auto"},
+                                            children=dcc.Graph(
+                                                id='heatmap-plot',
+                                                responsive=True,
+                                                style={"width": "100%", "height": "300px"},
+                                                config={
+                                                    'displayModeBar': True,
+                                                    'displaylogo': False,
+                                                    'modeBarButtonsToAdd': ['toImage'],
+                                                    'toImageButtonOptions': {
+                                                        'format': 'png',
+                                                        'filename': 'signature_similarity_heatmap',
+                                                        'scale': 2
+                                                    }
                                                 }
-                                            }
+                                            )
                                         )
                                     )
                                 ]
@@ -567,7 +646,7 @@ page1_layout = html.Div([
                         ]
                     ),
                     dmc.GridCol(
-                        span=6,
+                        span=12,
                         children=[
                             dmc.Card(
                                 style={
@@ -581,20 +660,23 @@ page1_layout = html.Div([
                                     dcc.Loading(
                                         id="loading-heatmap-reprint-plot",
                                         type="default",
-                                        children=dcc.Graph(
-                                            id='heatmap-reprint-plot',
-                                            config={
-                                                'displayModeBar': True,
-                                                'displaylogo': False,
-                                                'modeBarButtonsToAdd': ['toImage'],
-                                                'toImageButtonOptions': {
-                                                    'format': 'png',
-                                                    'filename': 'reprint_similarity_heatmap',
-                                                    'height': 600,
-                                                    'width': 800,
-                                                    'scale': 2
+                                        children=html.Div(
+                                            style={"overflowX": "auto"},
+                                            children=dcc.Graph(
+                                                id='heatmap-reprint-plot',
+                                                responsive=True,
+                                                style={"width": "100%", "height": "300px"},
+                                                config={
+                                                    'displayModeBar': True,
+                                                    'displaylogo': False,
+                                                    'modeBarButtonsToAdd': ['toImage'],
+                                                    'toImageButtonOptions': {
+                                                        'format': 'png',
+                                                        'filename': 'reprint_similarity_heatmap',
+                                                        'scale': 2
+                                                    }
                                                 }
-                                            }
+                                            )
                                         )
                                     )
                                 ]
@@ -613,7 +695,7 @@ page1_layout = html.Div([
     ),
 ])
 
-from utils.utils import parse_signatures, merge_uploaded_signatures, load_example_merged_signatures, EXAMPLE_SIGNATURE_FILES
+from utils.utils import parse_signatures, merge_uploaded_signatures, load_example_merged_signatures
 import dash
 
 
@@ -693,27 +775,88 @@ def show_upload_status(contents, filename):
 
 
 @app.callback(
+    Output('example-set-blurb', 'children'),
+    Input('example-set-select', 'value'),
+)
+def describe_example_set(example_set):
+    return EXAMPLE_SET_BLURBS.get(example_set, '')
+
+
+@app.callback(
     [Output('session-1-signatures', 'data', allow_duplicate=True),
      Output('upload-error-message-1', 'children', allow_duplicate=True),
      Output('toggle-heatmap', 'checked', allow_duplicate=True),
      Output('auto-reload-armed', 'data', allow_duplicate=True)],
     Input('load-example-btn', 'n_clicks'),
+    State('example-set-select', 'value'),
     prevent_initial_call=True,
+    running=[
+        (Output('load-example-btn', 'loading'), True, False),
+        (Output('load-example-btn', 'disabled'), True, False),
+    ],
 )
-def load_example_dataset(n_clicks):
+def load_example_dataset(n_clicks, example_set):
     if not n_clicks:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
-    df_signatures = load_example_merged_signatures()
-    info = f"Loaded example dataset: {', '.join(EXAMPLE_SIGNATURE_FILES)}"
+    example_set = example_set or DEFAULT_EXAMPLE_SET
+    spec = EXAMPLE_SIGNATURE_SETS.get(example_set, {})
+    label = spec.get('label', example_set)
+
+    try:
+        df_signatures, filenames = load_example_merged_signatures(example_set=example_set)
+    except (OSError, ValueError) as e:
+        alert = dmc.Alert(
+            f"Could not load '{label}': {e}",
+            icon=DashIconify(icon="tabler:alert-circle", width=18),
+            title="Error",
+            color="red",
+            withCloseButton=True
+        )
+        return dash.no_update, alert, dash.no_update, dash.no_update
+
+    n_signatures = df_signatures.shape[1] - 1  # minus the 'Type' column
+    info = f"Loaded dataset: {label} ({', '.join(filenames)})"
+
+    body = [
+        dmc.Text(f"{label} — {n_signatures} signatures from "
+                 f"{len(filenames)} file(s): {', '.join(filenames)}", size="sm"),
+    ]
+    if n_signatures > LEGIBLE_SIGNATURE_LIMIT:
+        body.append(dmc.Text(
+            f"That is more than {LEGIBLE_SIGNATURE_LIMIT} signatures, so heatmap labels "
+            "will be small. Narrow the selection in 'Select Signatures' to read them.",
+            size="xs", c="dimmed", style={"marginTop": "0.25rem"}))
+
     alert = dmc.Alert(
-        f"Loaded example dataset ({len(EXAMPLE_SIGNATURE_FILES)} files merged): {', '.join(EXAMPLE_SIGNATURE_FILES)}",
+        body,
         icon=DashIconify(icon="tabler:check-circle", width=18),
-        title="Example Loaded",
+        title="Dataset Loaded",
         color="blue",
         withCloseButton=True
     )
-    return {'signatures_data': df_signatures.to_dict('records'), 'filename': EXAMPLE_SIGNATURE_FILES, 'info': info}, alert, False, True
+    return {'signatures_data': df_signatures.to_dict('records'), 'filename': filenames, 'info': info}, alert, False, True
+
+
+@app.callback(
+    Output('signature-legibility-warning', 'children'),
+    Input('signatures-dropdown-1', 'value'),
+)
+def warn_on_signature_count(selected_signatures):
+    """The clustered heatmap drops to ~6px labels past ~40 signatures. Say so
+    instead of silently rendering an unreadable plot."""
+    n = len(selected_signatures or [])
+    if n <= LEGIBLE_SIGNATURE_LIMIT:
+        return ''
+    return dmc.Alert(
+        f"{n} signatures selected. Above {LEGIBLE_SIGNATURE_LIMIT} the heatmap and "
+        "dendrogram labels become too small to read, and clustering gets slow — "
+        "deselect some, or load a smaller dataset.",
+        icon=DashIconify(icon="tabler:alert-triangle", width=18),
+        color="yellow",
+        withCloseButton=True,
+        style={"marginTop": "0.5rem"},
+    )
 
 @app.callback(
     [Output('session-1-signatures', 'data', allow_duplicate=True),
@@ -756,10 +899,33 @@ def toggle_collapse(n, is_open):
 
 
 
+# Placeholder state (no figure yet). Height matches the clustermap's floor so
+# the box never shrinks below what plotly needs: a real figure arriving into a
+# short box aborts its own render, and the graph then stays blank.
+_EMPTY_GRAPH_STYLE = {"width": "100%", "height": f"{MIN_FIGURE_SIZE}px"}
+
+
+def _graph_style(fig):
+    """Build the dcc.Graph style from the size range the figure carries in
+    layout.meta: fill the container, but stay square and clamped between the
+    readability floor (scroll appears below it) and the max useful size."""
+    meta = fig.layout.meta or {}
+    return {
+        "width": "100%",
+        "minWidth": f"{meta.get('min_size', MIN_FIGURE_SIZE)}px",
+        "maxWidth": f"{meta.get('max_size', 1400)}px",
+        "minHeight": f"{MIN_FIGURE_SIZE}px",
+        "aspectRatio": "1 / 1",
+        "margin": "0 auto",
+    }
+
+
 @app.callback(
     [Output('form-output', 'children'),
      Output('heatmap-plot', 'figure'),
-     Output('heatmap-reprint-plot', 'figure')],
+     Output('heatmap-reprint-plot', 'figure'),
+     Output('heatmap-plot', 'style'),
+     Output('heatmap-reprint-plot', 'style')],
     [Input('initial-load-1', 'n_intervals'),
      Input('reload-signal', 'data'),
      Input('submit-button', 'n_clicks'),
@@ -771,17 +937,18 @@ def toggle_collapse(n, is_open):
      State('epsilon', 'value'),
      State('cluster-threshold', 'value'),
      State('session-1-signatures', 'data'),
+     State('paper-groups-switch', 'checked'),
      ],
     running=[
         (Output('submit-button', 'loading'), True, False),
         (Output('submit-button', 'disabled'), True, False),
     ],
 )
-def update_output(init_load, reload_signal, n_clicks, hide_heatmap, selected_file, selected_signatures, distance_metric, clustering_method, epsilon, cluster_threshold, signatures):
+def update_output(init_load, reload_signal, n_clicks, hide_heatmap, selected_file, selected_signatures, distance_metric, clustering_method, epsilon, cluster_threshold, signatures, show_paper_groups):
     trigger_id = ctx.triggered_id or 'initial-load-1'
 
     if not selected_signatures or not selected_file:
-        return '', {}, {}
+        return '', {}, {}, _EMPTY_GRAPH_STYLE, _EMPTY_GRAPH_STYLE
 
     functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
     metric_labels = {'rmse': 'RMSE', 'cosine': 'Cosine', 'js_divergence': 'JS Divergence'}
@@ -791,18 +958,18 @@ def update_output(init_load, reload_signal, n_clicks, hide_heatmap, selected_fil
         data_df = pd.DataFrame(signatures['signatures_data'])
         data_df.index = data_df['Type']
         data_df = data_df.drop(columns='Type')[selected_signatures]
-        df_reprint = reprint(data_df, epsilon=epsilon)
-        return (f'Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
-                create_heatmap_with_custom_sim(data_df, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label),
-                create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label)
-                )
     else:
-        df_signatures = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)[selected_signatures]
-        df_reprint = reprint(df_signatures, epsilon=epsilon)
-        return (f'Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
-                create_heatmap_with_custom_sim(df_signatures, calc_func=functions[distance_metric], colorscale='YlGnBu', hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label),
-                create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale='OrRd', hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label)
-                )
+        data_df = pd.read_csv(f"data/signatures/{selected_file}", sep='\t', index_col=0)[selected_signatures]
+
+    # GnBu for the signatures, OrRd for the RePrints: the ColorBrewer ramps the
+    # published figures use, so the two can be compared side by side.
+    annotation_groups = PAPER_GOLD_STANDARD_GROUPS if show_paper_groups else None
+
+    df_reprint = reprint(data_df, epsilon=epsilon)
+    fig_sig = create_heatmap_with_custom_sim(data_df, calc_func=functions[distance_metric], colorscale=GNBU_9, hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label, annotation_groups=annotation_groups)
+    fig_rep = create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale=ORRD_9, hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label, annotation_groups=annotation_groups)
+    return (f'Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
+            fig_sig, fig_rep, _graph_style(fig_sig), _graph_style(fig_rep))
 
 @app.callback(
     [Output('signatures-dropdown-1', 'options'),
@@ -962,7 +1129,9 @@ def _empty_heatmap_fig():
 
 @app.callback(
     [Output('heatmap-plot', 'figure', allow_duplicate=True),
-     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-plot', 'style', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'style', allow_duplicate=True)],
     [Input('distance-metric', 'value'),
      Input('clustering-method', 'value'),
      Input('epsilon', 'value'),
@@ -971,39 +1140,45 @@ def _empty_heatmap_fig():
 )
 def clear_plots_on_parameter_change(distance_metric, clustering_method, epsilon, cluster_threshold):
     """Clear plots when parameters change to avoid showing outdated data"""
-    return _empty_heatmap_fig(), _empty_heatmap_fig()
+    return _empty_heatmap_fig(), _empty_heatmap_fig(), _EMPTY_GRAPH_STYLE, _EMPTY_GRAPH_STYLE
 
 
 @app.callback(
     [Output('heatmap-plot', 'figure', allow_duplicate=True),
-     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-plot', 'style', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'style', allow_duplicate=True)],
     Input('signatures-dropdown-1', 'value'),
     prevent_initial_call=True
 )
 def clear_plots_on_signature_change(selected_signatures):
     """Clear plots when signature selection changes"""
-    return _empty_heatmap_fig(), _empty_heatmap_fig()
+    return _empty_heatmap_fig(), _empty_heatmap_fig(), _EMPTY_GRAPH_STYLE, _EMPTY_GRAPH_STYLE
 
 
 @app.callback(
     [Output('heatmap-plot', 'figure', allow_duplicate=True),
-     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-plot', 'style', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'style', allow_duplicate=True)],
     Input('dropdown-1', 'value'),
     prevent_initial_call=True
 )
 def clear_plots_on_file_change(selected_file):
     """Clear plots when reference file changes"""
-    return _empty_heatmap_fig(), _empty_heatmap_fig()
+    return _empty_heatmap_fig(), _empty_heatmap_fig(), _EMPTY_GRAPH_STYLE, _EMPTY_GRAPH_STYLE
 
 
 @app.callback(
     [Output('heatmap-plot', 'figure', allow_duplicate=True),
-     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True)],
+     Output('heatmap-reprint-plot', 'figure', allow_duplicate=True),
+     Output('heatmap-plot', 'style', allow_duplicate=True),
+     Output('heatmap-reprint-plot', 'style', allow_duplicate=True)],
     Input('session-1-signatures', 'data'),
     prevent_initial_call=True
 )
 def clear_plots_on_upload(uploaded_data):
     """Clear plots when new signatures are uploaded"""
     if uploaded_data is not None:
-        return _empty_heatmap_fig(), _empty_heatmap_fig()
-    return dash.no_update, dash.no_update
+        return _empty_heatmap_fig(), _empty_heatmap_fig(), _EMPTY_GRAPH_STYLE, _EMPTY_GRAPH_STYLE
+    return dash.no_update, dash.no_update, dash.no_update, dash.no_update

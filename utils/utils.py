@@ -36,9 +36,11 @@ def normalize(data):
     return (data - np.nanmin(data)) / (np.nanmax(data) - np.nanmin(data))
 
 def calculate_rmse(x, y):
-    x_normalized = normalize(x)
-    y_normalized = normalize(y)
-    return np.sqrt(np.nanmean((x_normalized - y_normalized) ** 2))
+    """Root mean square error between two signature vectors.
+    """
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    return np.sqrt(np.nanmean((x - y) ** 2))
 
 def calculate_cosine(x, y):
     return 1-np.dot(x, y) / (np.sqrt(np.dot(x, x)) * np.sqrt(np.dot(y, y)))
@@ -230,22 +232,241 @@ def merge_uploaded_signatures(contents_list, filenames_list):
     return _merge_signature_dataframes(named_dfs), errors
 
 
-# Bundled example signature files (data/signatures/) offered as a one-click
-# "Load Example" demo of merging multiple datasets for clustering.
-EXAMPLE_SIGNATURE_FILES = [
-    'COSMIC_v3.4_SBS_GRCh37.txt',
-    'Kucab2019-sub_signature.txt',
-    'Zou2018-signatures.SBS-96.tsv',
+# ============================================================================
+# Bundled example signature sets
+# ============================================================================
+
+PAPER_SIGNATURE_DIR = 'data/signatures/paper'
+DEFAULT_SIGNATURE_DIR = 'data/signatures'
+
+# Above this many signatures the heatmap's labels stop being legible; the UI
+# warns rather than silently truncating the user's selection.
+LEGIBLE_SIGNATURE_LIMIT = 60
+
+EXAMPLE_SIGNATURE_SETS = {
+    'paper_gold_standard': {
+        'label': 'Paper - gold-standard clusters (39)',
+        'blurb': "The paper's Table 1 reference clusters: COSMIC, mutagen exposures and "
+                 "repair-gene knockouts that share a DNA repair pathway (MMRd, HRD, PAHs, "
+                 "NitroPAHs, ROS, TMZ, Platinum, AAs).",
+        'dir': PAPER_SIGNATURE_DIR,
+        'files': ['RePrint_gold_standard_clusters.txt'],
+    },
+    'paper_mutagens_ko': {
+        'label': 'Paper - mutagens + knockouts (35)',
+        'blurb': '28 Kucab2019 environmental mutagen exposures merged with 7 Zou2021 '
+                 'DNA-repair gene knockouts. No COSMIC signatures, so damage source and '
+                 'repair deficiency can be compared directly.',
+        'dir': PAPER_SIGNATURE_DIR,
+        'files': [
+            'RePrint_Kucab2019_mutagens.txt',
+            'RePrint_Zou2021_repair_KO.txt',
+        ],
+    },
+    'paper_cosmic': {
+        'label': 'Paper - COSMIC v3.4 curated (67)',
+        'blurb': 'COSMIC v3.4 (GRCh37) as used in the paper: the full catalogue minus the '
+                 '19 signatures flagged as possible sequencing artefacts.',
+        'dir': PAPER_SIGNATURE_DIR,
+        'files': ['RePrint_COSMIC_v3.4_SBS_GRCh37.txt'],
+    },
+    'paper_full': {
+        'label': 'Paper - full set (102)',
+        'blurb': 'Everything the paper analysed: 67 curated COSMIC signatures, 28 mutagen '
+                 'exposures and 7 repair-gene knockouts. Large - expect small labels; use '
+                 'the signature selector to narrow it down.',
+        'dir': PAPER_SIGNATURE_DIR,
+        'files': [
+            'RePrint_COSMIC_v3.4_SBS_GRCh37.txt',
+            'RePrint_Kucab2019_mutagens.txt',
+            'RePrint_Zou2021_repair_KO.txt',
+        ],
+    },
+    # --- Other bundled sets -------------------------------------------------
+    # COSMIC v2's 30 signatures plus the three Zou2018 knockouts. Small and
+    # sparse enough that DNA-repair families stay separable: the mismatch-repair
+    # signatures (6, 14, 15, 20, 21, 26) group with the MSH6 knockout, and
+    # signatures 3 and 8 group with FANCC.
+    'cosmic_v2_zou': {
+        'label': 'COSMIC v2 + Zou2018 knockouts (33)',
+        'blurb': '30 COSMIC v2 signatures and 3 DNA-repair gene knockouts '
+                 '(EXO1, FANCC, MSH6).',
+        'dir': DEFAULT_SIGNATURE_DIR,
+        'files': [
+            'COSMIC_v2_SBS_GRCh37.txt',
+            'Zou2018-signatures.SBS-96.tsv',
+        ],
+    },
+}
+
+DEFAULT_EXAMPLE_SET = 'paper_gold_standard'
+
+
+# ============================================================================
+# The published COSMIC+Enviro+KO figure
+# ============================================================================
+
+PAPER_GOLD_STANDARD_GROUPS = [
+    {
+        'name': 'PAHs',
+        'pathway': 'NER',
+        'color': '#36648B',  # SteelBlue4
+        'members': [
+            'SBS4',
+            'BaP (2 uM) + S9',
+            'BPDE (0.125 uM)',
+            'DBP (0.0313 uM) + S9',
+            'DBPDE (0.000625 uM)',
+            'DBADE (0.109 uM)',
+            'DBAC (5 uM) + S9',
+            'DBA (75 uM) + S9',
+            '5-Methylchrysene (1.6 uM) + S9',
+        ],
+    },
+    {
+        'name': 'Nitro-PAHs',
+        'pathway': 'NER',
+        'color': '#63B8FF',  # SteelBlue1
+        'members': [
+            '3-NBA (0.1 uM)',
+            '1,8-DNP (8 uM)',
+            '6-Nitrochrysene (50 uM) + S9',
+            '6-Nitrochrysene (50 uM)',
+        ],
+    },
+    {
+        'name': 'Platinum',
+        'pathway': 'NER',
+        'color': '#A2CD5A',  # DarkOliveGreen3
+        'members': [
+            'SBS31',
+            'SBS35',
+            'Cisplatin (12.5 uM)',
+            'Carboplatin (5 uM)',
+        ],
+    },
+    {
+        'name': 'Aristolochic acids',
+        'pathway': 'NER',
+        'color': '#CAFF70',  # DarkOliveGreen1
+        'members': [
+            'SBS22a',
+            'SBS22b',
+            'AAI (1.25 uM)',
+        ],
+    },
+    {
+        'name': 'ROS',
+        'pathway': 'BER',
+        'color': '#CAE1FF',  # LightSteelBlue1
+        'members': [
+            'SBS18',
+            'SBS36',
+            'SBS38',
+        ],
+    },
+    {
+        'name': 'HRD',
+        'pathway': 'HR',
+        'color': '#EE9572',  # Salmon2
+        'members': [
+            'SBS3',
+            'EXO1_KO',
+            'RNF168_KO',
+        ],
+    },
+    {
+        'name': 'MMRd',
+        'pathway': 'MMR',
+        'color': '#FF0000',  # red
+        'members': [
+            'SBS6',
+            'SBS14',
+            'SBS15',
+            'SBS20',
+            'SBS21',
+            'SBS26',
+            'SBS44',
+            'MSH6_KO',
+            'PMS1_KO',
+            'PMS2_KO',
+        ],
+    },
+    {
+        'name': 'Alkylating agents',
+        'pathway': 'MMR',
+        'color': '#FFAEB9',  # LightPink1
+        'members': [
+            'SBS11',
+            'Temozolomide (200 uM)',
+            'MNU (350 uM)',
+        ],
+    },
 ]
 
+PAPER_FIGURE_PRESET = {
+    'example_set': 'paper_full',      # the 102 signatures the figure is built on
+    'distance_metric': 'rmse',        # the figure's other panel pair uses 'cosine'
+    'clustering_method': 'complete',
+    'epsilon': 1e-4,
+}
 
-def load_example_merged_signatures(base_dir='data/signatures'):
-    """Read and merge the bundled example signature files from disk, the
-    same way merge_uploaded_signatures merges user-uploaded files."""
-    named_dfs = []
-    for filename in EXAMPLE_SIGNATURE_FILES:
+
+def gold_standard_group_of(signature):
+    """Group name a signature is annotated with in the published figure, or
+    None for the columns the figure leaves blank."""
+    for group in PAPER_GOLD_STANDARD_GROUPS:
+        if signature in group['members']:
+            return group['name']
+    return None
+
+
+def _example_set_dir(example_set):
+    return EXAMPLE_SIGNATURE_SETS[example_set].get('dir', DEFAULT_SIGNATURE_DIR)
+
+
+def example_set_signature_count(example_set, base_dir=None):
+    """Number of signature columns a set contributes, read from file headers."""
+    spec = EXAMPLE_SIGNATURE_SETS[example_set]
+    directory = base_dir or _example_set_dir(example_set)
+
+    total = 0
+    for filename in spec['files']:
         sep = ',' if filename.endswith('.csv') else '\t'
-        df = pd.read_csv(f'{base_dir}/{filename}', sep=sep)
+        header = pd.read_csv(f'{directory}/{filename}', sep=sep, nrows=0)
+        total += len(header.columns) - 1  # minus the 'Type' column
+    return total
+
+
+def example_set_options():
+    """[{label, value, blurb, count}] for the example-dataset picker, in
+    declaration order (smallest/most useful set first)."""
+    options = []
+    for key, spec in EXAMPLE_SIGNATURE_SETS.items():
+        options.append({
+            'label': spec['label'],
+            'value': key,
+            'blurb': spec['blurb'],
+            'count': example_set_signature_count(key),
+        })
+    return options
+
+
+def load_example_merged_signatures(base_dir=None, example_set=DEFAULT_EXAMPLE_SET):
+    """Read and merge one bundled example set from disk, the same way
+    merge_uploaded_signatures merges user-uploaded files. Returns
+    (merged_df, filenames)."""
+    if example_set not in EXAMPLE_SIGNATURE_SETS:
+        example_set = DEFAULT_EXAMPLE_SET
+
+    spec = EXAMPLE_SIGNATURE_SETS[example_set]
+    filenames = spec['files']
+    directory = base_dir or _example_set_dir(example_set)
+
+    named_dfs = []
+    for filename in filenames:
+        sep = ',' if filename.endswith('.csv') else '\t'
+        df = pd.read_csv(f'{directory}/{filename}', sep=sep)
         named_dfs.append((filename, df))
 
-    return _merge_signature_dataframes(named_dfs)
+    return _merge_signature_dataframes(named_dfs), filenames
