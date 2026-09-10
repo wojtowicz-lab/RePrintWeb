@@ -6,7 +6,7 @@ from main import app
 from dash import dcc, html, Input, Output, State, ctx
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
-from pages.nav import navbar
+from pages.nav import navbar, license_footer
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -698,6 +698,9 @@ page1_layout = html.Div([
             dcc.Download(id="download-dataframe-csv-signatures")
         ]
     ),
+
+    # License footer (see pages/nav.py)
+    license_footer,
 ])
 
 from utils.utils import parse_signatures, merge_uploaded_signatures, load_example_merged_signatures
