@@ -89,3 +89,7 @@ A[C>A]C	0.03	0.04
 4. Click **Clear Session** to reset uploaded data.
 
 ---
+
+### 📄 License
+
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.

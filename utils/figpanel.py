@@ -353,7 +353,7 @@ def create_reprint_footprint_figure(df_reprint, signature, title=None, show_x_la
     return fig
 
 
-def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blues', hide_heatmap=False, method='complete', cluster_threshold_frac=0.7, metric_label='Similarity', annotation_groups=None):
+def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blues', hide_heatmap=False, method='complete', cluster_threshold_frac=0.7, metric_label='Similarity', annotation_groups=None, linkage_input='metric'):
     """Clustered distance-matrix heatmap, built the way the RePrint paper's
     figures are.
 
@@ -361,6 +361,14 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
     When given, the strip above the matrix colours each column by the fixed
     group it belongs to (blank for columns in no group) instead of by the
     clusters cut out of this particular dendrogram.
+
+    linkage_input: what the dendrogram is built from. 'metric' (default)
+    feeds the calc_func distances straight into scipy's linkage. 'euclidean'
+    treats the calc_func distance matrix as a table of observations and
+    clusters its rows by the Euclidean distance between them, i.e. signatures
+    with similar distance profiles end up together (this is also what
+    plotly's create_dendrogram does by default when handed a matrix).
+    The heatmap shows the calc_func distances in both modes.
     """
     # Transpose data and get labels
     df = df.T
@@ -393,8 +401,15 @@ def create_heatmap_with_custom_sim(df, calc_func=calculate_rmse, colorscale='Blu
             dist_matrix[i, j] = rmse
             dist_matrix[j, i] = rmse
 
-    condensed_rmse = squareform(dist_matrix)
-    Z = linkage(condensed_rmse, method=method)
+    if linkage_input == 'euclidean':
+        # Euclidean distance between the rows (distance profiles) of the
+        # metric matrix, as ff.create_dendrogram(dist_matrix) computes it.
+        condensed = pdist(dist_matrix, metric='euclidean')
+    elif linkage_input == 'metric':
+        condensed = squareform(dist_matrix)
+    else:
+        raise ValueError(f"linkage_input must be 'metric' or 'euclidean', got {linkage_input!r}")
+    Z = linkage(condensed, method=method)
 
     if hide_heatmap:
         # No heatmap: show a standalone vertical dendrogram (leaves along the

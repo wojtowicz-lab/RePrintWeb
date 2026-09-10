@@ -6,7 +6,7 @@ from main import app
 from dash import dcc, html, Input, Output, State, ctx
 import dash_mantine_components as dmc
 from dash_iconify import DashIconify
-from pages.nav import navbar
+from pages.nav import navbar, license_footer
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -121,6 +121,10 @@ page1_layout = html.Div([
                                                         ),
                                                         html.Li(
                                                             [html.Strong("JS Divergence: "), "Jensen-Shannon divergence (symmetric version of Kullback-Leibler divergence)"],
+                                                            style={"marginBottom": "0.75rem", "fontSize": "0.95rem", "color": COLORS["text_primary"]}
+                                                        ),
+                                                        html.Li(
+                                                            [html.Strong("Euclidean: "), "Heatmap shows RMSE; the dendrogram clusters signatures by the Euclidean distance between their rows of the RMSE matrix (their RMSE profiles against all other signatures)"],
                                                             style={"fontSize": "0.95rem", "color": COLORS["text_primary"]}
                                                         ),
                                                     ], style={"paddingLeft": "1.5rem"}),
@@ -473,7 +477,8 @@ page1_layout = html.Div([
                                                 options=[
                                                     {'label': 'Cosine', 'value': 'cosine'},
                                                     {'label': 'RMSE', 'value': 'rmse'},
-                                                    {'label': 'JS Divergence', 'value': 'js_divergence'}
+                                                    {'label': 'JS Divergence', 'value': 'js_divergence'},
+                                                    {'label': 'Euclidean', 'value': 'euclidean'},
                                                 ],
                                                 value='rmse',
                                                 style={"width": "100%"}
@@ -693,6 +698,9 @@ page1_layout = html.Div([
             dcc.Download(id="download-dataframe-csv-signatures")
         ]
     ),
+
+    # License footer (see pages/nav.py)
+    license_footer,
 ])
 
 from utils.utils import parse_signatures, merge_uploaded_signatures, load_example_merged_signatures
@@ -950,9 +958,13 @@ def update_output(init_load, reload_signal, n_clicks, hide_heatmap, selected_fil
     if not selected_signatures or not selected_file:
         return '', {}, {}, _EMPTY_GRAPH_STYLE, _EMPTY_GRAPH_STYLE
 
-    functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence}
-    metric_labels = {'rmse': 'RMSE', 'cosine': 'Cosine', 'js_divergence': 'JS Divergence'}
+    # 'euclidean': the heatmap shows RMSE, but the dendrogram is built from
+    # Euclidean distances between the rows of the RMSE matrix (RMSE profiles)
+    # instead of from the RMSE values themselves.
+    functions = {'rmse': calculate_rmse, 'cosine': calculate_cosine, 'js_divergence': calculate_js_divergence, 'euclidean': calculate_rmse}
+    metric_labels = {'rmse': 'RMSE', 'cosine': 'Cosine', 'js_divergence': 'JS Divergence', 'euclidean': 'RMSE'}
     metric_label = metric_labels[distance_metric]
+    linkage_input = 'euclidean' if distance_metric == 'euclidean' else 'metric'
 
     if signatures is not None:
         data_df = pd.DataFrame(signatures['signatures_data'])
@@ -966,8 +978,8 @@ def update_output(init_load, reload_signal, n_clicks, hide_heatmap, selected_fil
     annotation_groups = PAPER_GOLD_STANDARD_GROUPS if show_paper_groups else None
 
     df_reprint = reprint(data_df, epsilon=epsilon)
-    fig_sig = create_heatmap_with_custom_sim(data_df, calc_func=functions[distance_metric], colorscale=GNBU_9, hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label, annotation_groups=annotation_groups)
-    fig_rep = create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale=ORRD_9, hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label, annotation_groups=annotation_groups)
+    fig_sig = create_heatmap_with_custom_sim(data_df, calc_func=functions[distance_metric], colorscale=GNBU_9, hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label, annotation_groups=annotation_groups, linkage_input=linkage_input)
+    fig_rep = create_heatmap_with_custom_sim(df_reprint, calc_func=functions[distance_metric], colorscale=ORRD_9, hide_heatmap=hide_heatmap, method=clustering_method, cluster_threshold_frac=cluster_threshold, metric_label=metric_label, annotation_groups=annotation_groups, linkage_input=linkage_input)
     return (f'Distance Metric: {distance_metric}, Clustering Method: {clustering_method}, Epsilon: {epsilon}',
             fig_sig, fig_rep, _graph_style(fig_sig), _graph_style(fig_rep))
 
