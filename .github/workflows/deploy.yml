@@ -7,6 +7,7 @@ on:
 
 jobs:
   deploy:
+    if: github.repository == 'marcin119a/RePrintWeb'
     runs-on: ubuntu-latest
     steps:
       - name: SSH deploy (through duch.mimuw.edu.pl jump host)
@@ -22,7 +23,7 @@ jobs:
           script: |
             set -e
             cd ~/RePrintWeb
-            git fetch origin main
+            timeout 120 git fetch origin main
             git reset --hard origin/main
             if [ ! -f .venv/bin/activate ]; then
               python3 -m venv .venv
