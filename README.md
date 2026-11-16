@@ -93,3 +93,8 @@ A[C>A]C	0.03	0.04
 ### 📄 License
 
 This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
+
+
+## Funding
+
+The project was financed by the Polish National Agency for Academic Exchange within the Polish Returns Programme (PPN/PPO/2020/1/00028).
